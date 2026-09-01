@@ -195,15 +195,36 @@ jobs:
 
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml up -d --build
 
-          for _ in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
-              break
-            fi
-            sleep 0.5
-          done
+          wait_app() {
+            for _ in $(seq 1 90); do
+              if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
+                return 0
+              fi
+              sleep 0.5
+            done
+            return 1
+          }
+          wait_worker() {
+            for _ in $(seq 1 60); do
+              if docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T browser-worker node -e "const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>process.exit(x.statusCode===200?0:1));r.on('error',()=>process.exit(1));"; then
+                return 0
+              fi
+              sleep 0.5
+            done
+            return 1
+          }
 
+          wait_worker
+          wait_app
           curl --fail --silent http://127.0.0.1:19001/health | grep -q 'healthy'
-          curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'
-          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T browser-worker node -e "const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>process.exit(x.statusCode===200?0:1));r.on('error',()=>process.exit(1));"
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/config.json
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/data.db
+
+          # RC regression: both containers must recover through their normal
+          # entrypoints and the named data volume must survive process restart.
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml restart browser-worker
+          wait_worker
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml restart gpt-mirror
+          wait_app
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/config.json
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/data.db
