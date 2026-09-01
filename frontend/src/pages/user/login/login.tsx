@@ -1,12 +1,11 @@
-import {SetStateAction, useEffect, useMemo, useState} from 'react';
+import {SetStateAction, useEffect, useState} from 'react';
 import {Iconify} from "@/components/icon";
 import shareService from "@/api/services/shareService.ts";
 import sysService from "@/api/services/sysService.ts";
 import {message} from "antd";
 
 const LoginPage = () => {
-  const [title, setTitle] = useState('Pandora');
-  const [fuclaudeDomain, setFuclaudeDomain] = useState('https://demo.fuclaude.com');
+  const [title, setTitle] = useState('GPT Mirror');
   const [input, setInput] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -17,17 +16,10 @@ const LoginPage = () => {
   useEffect(() => {
     sysService.getLoginSetting().then((data) => {
       setTitle(data.pageTitle);
-      if (data.fuclaudeDomain) {
-        setFuclaudeDomain(data.fuclaudeDomain);
-      }
     }).catch(_ => {
       message.error("获取标题失败")
     });
   }, []);
-
-  const isSessionKey = useMemo(() => {
-    return /^sk-ant-.*/.test(input.trim());
-  }, [input]);
 
   const handleInputChange = (e: { target: { value: SetStateAction<string>; }; }) => {
     setInput(e.target.value);
@@ -43,11 +35,6 @@ const LoginPage = () => {
 
   const handleInputSubmit = (e: { preventDefault: () => void; }) => {
     e.preventDefault();
-    if (isSessionKey) {
-      setLoading(true)
-      window.location.href = `${fuclaudeDomain}/login_token?session_key=${input}`;
-      return
-    }
     if (input) {
       setIsInputSubmitted(true);
     }
@@ -92,13 +79,11 @@ const LoginPage = () => {
   const getButtonText = () => {
     if (loading) return <Iconify icon={'line-md:loading-loop'} />
     if (isInputSubmitted) return 'Log in';
-    if (isSessionKey) return 'Continue with SessionKey';
     return 'Continue with UniqueName';
   };
 
   return (
     <div className="min-h-screen max-h-screen bg-page-bg">
-      {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 bg-page-bg z-10">
         <div className="container mx-auto px-8 py-6">
           <div className="flex items-center justify-center">
@@ -108,7 +93,6 @@ const LoginPage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="pt-12 flex flex-col items-center justify-center min-h-screen p-4">
         <div className="text-center mb-6">
           <h1 className="font-light font-serif text-6xl" style={{
@@ -125,16 +109,13 @@ const LoginPage = () => {
           </p>
         </div>
 
-        {/* Login Container */}
         <div className="bg-white rounded-3xl shadow-[0_4px_24px_0_#00000004,0_4px_32px_0_#00000004,0_2px_64px_0_#00000003,0_16px_32px_0_#00000003] p-6 w-full max-w-md bg-white border-1"
              style={{
                borderWidth: '0.5px',
                borderColor: 'rgba(112, 107, 87, 0.25)',
                fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
              }}>
-          {/* Login Form */}
           <form onSubmit={isInputSubmitted ? handleLogin : handleInputSubmit}>
-            {/* Email Input Group */}
             <div className="relative mb-4">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">
                 <Iconify icon={'material-symbols-light:mail-outline-rounded'} size={'1.35em'} />
@@ -142,7 +123,7 @@ const LoginPage = () => {
               <input
                 value={input}
                 onChange={handleInputChange}
-                placeholder="Enter your uniqueName or sessionKey"
+                placeholder="Enter your uniqueName"
                 className="w-full pl-10 pr-10 p-3 border border-gray-300 rounded-lg bg-input-bg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 readOnly={isInputSubmitted}
               />
@@ -157,7 +138,6 @@ const LoginPage = () => {
               )}
             </div>
 
-            {/* Password Input - Only shown after email is submitted */}
             <div className={`transform transition-all duration-300 ease-in-out overflow-hidden ${
               isInputSubmitted ? 'max-h-20 opacity-100 mb-4' : 'max-h-0 opacity-0'
             }`}>
@@ -200,27 +180,17 @@ const LoginPage = () => {
             </button>
           </form>
 
-          {/* Terms */}
           {!isInputSubmitted ? <div>
               <p className="mt-6 text-center text-text-400 text-xs text-gray-600">
-                By continuing, you agree to LINUX DO's{' '}
-                <a href="#" className="underline text-gray-600 no-blue"
-                   style={{color: 'inherit', textDecoration: 'underline'}}>Consumer
-                  Terms</a> and{' '}
-                <a href="#" className="underline text-gray-600 no-blue"
-                   style={{color: 'inherit', textDecoration: 'underline'}}>Usage
-                  Policy</a>, and acknowledge their{' '}
-              <a href="#" className="underline text-gray-600 no-blue"
-                 style={{color: 'inherit', textDecoration: 'underline'}}>Privacy
-                Policy</a>.
-            </p>
-          </div> :
+                Shared-account login is temporarily unavailable until a ChatGPT provider is configured.
+              </p>
+            </div> :
             <div>
               <p className="mt-6 text-center text-text-400 text-xs text-gray-600">
-                You can {' '}
-                <button className="underline  text-gray-600 no-blue" onClick={() => setIsChangePassword(!isChangePassword)}
-                   style={{color: 'inherit', textDecoration: 'underline'}}>change your password</button>{' '}
-                at any time as long as you know your original password.
+                You can{' '}
+                <button className="underline text-gray-600 no-blue" onClick={() => setIsChangePassword(!isChangePassword)}
+                   style={{color: 'inherit', textDecoration: 'underline'}}>change your local share password</button>{' '}
+                while provider-backed login is unavailable.
               </p>
             </div>
           }
