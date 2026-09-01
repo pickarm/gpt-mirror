@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pattern='json:"(password|sessionToken|accessToken|refreshToken|sessionKey|proxyUrl)"'
+          pattern='json:"(password|sessionToken|accessToken|refreshToken|sessionKey|proxyUrl|cookie)"'
           if git grep -n -E "$pattern" -- internal/model/account.go; then
             echo "Sensitive Account field became JSON-serializable. Use an explicit write DTO and redacted read model."
             exit 1
@@ -82,7 +82,17 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Run full Go test suite
-        run: go test ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee /tmp/go-test.log
+      - name: Upload Go test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-log-${{ github.run_id }}
+          path: /tmp/go-test.log
+          retention-days: 1
       - name: Build server
         run: go build -trimpath -ldflags='-s -w' -o /tmp/gpt-mirror ./cmd/server
       - name: Build web mirror probe
