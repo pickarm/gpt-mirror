@@ -6,38 +6,23 @@
   "http": {
     "host": "0.0.0.0",
     "port": 9000,
-    "proxy-pass": {
-      "fuclaude": {
-        "enable": true,
-        "host": "https://demo.fuclaude.com",
-        "port": 9002
-      },
-      "oaifree": {
-        "enable": true,
-        "host": "https://new.oaifree.com",
-        "port": 9001
-      }
-    },
     "rate": 1000,
-    "title": "Pandora"
+    "title": "GPT Mirror"
   },
   "moderation": {
     "apikey": "",
-    "apiurl": "https://api-proxy.oaipro.com/v1/moderations",
+    "apiurl": "",
     "message": "您的消息包含不当内容，请修改后重试!"
   },
   "oneapi": {
     "domain": "",
     "token": ""
   },
-  "pandora": {
-    "domain": {
-      "chat": "https://chat.oaifree.com",
-      "token": "https://token.oaifree.com",
-      "index": "https://new.oaifree.com",
-      "claude": "https://demo.fuclaude.com"
-    },
-    "account_refresh_cron": ""
+  "account": {
+    "refresh": {
+      "enabled": false,
+      "cron": ""
+    }
   },
   "security": {
     "2fa_secret": "",
@@ -45,6 +30,9 @@
   },
   "share": {
     "custom": true,
-    "random": true
+    "random": true,
+    "refresh": {
+      "enabled": false
+    }
   }
 }

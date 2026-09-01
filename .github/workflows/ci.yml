@@ -59,7 +59,7 @@ jobs:
           cache: true
       - name: Build server
         run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
-      - name: Start from a fresh data directory
+      - name: Start from a fresh data directory without legacy upstreams
         shell: bash
         run: |
           set -euo pipefail
@@ -69,10 +69,8 @@ jobs:
             .security.admin_password = "ci-baseline-password" |
             .http.host = "127.0.0.1" |
             .http.port = 19000 |
-            .http["proxy-pass"].oaifree.enable = false |
-            .http["proxy-pass"].fuclaude.enable = false |
-            .pandora.domain.index = "http://127.0.0.1:9" |
-            .pandora.domain.claude = "http://127.0.0.1:9" |
+            .account.refresh.enabled = false |
+            .share.refresh.enabled = false |
             .database.dsn = "./data/data.db"
           ' data/config.json > "$workdir/data/config.json"
 
@@ -95,6 +93,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:19000/health | grep -q 'healthy'
           curl --fail --silent http://127.0.0.1:19000/readiness | grep -q 'ready'
           test -f "$workdir/data/data.db"
+          ! grep -Eqi 'oaifree|fuclaude' "$workdir/server.log"
 
   docker:
     name: Docker image build

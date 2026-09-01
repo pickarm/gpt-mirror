@@ -8,20 +8,13 @@ import (
 )
 
 func doesPathExist(path string) bool {
-	// 使用os.Stat来获取文件/目录状态
 	_, err := os.Stat(path)
-
-	// 如果没有错误，说明路径存在
 	if err == nil {
 		return true
 	}
-
-	// 如果错误是因为路径不存在，返回false
 	if os.IsNotExist(err) {
 		return false
 	}
-
-	// 对于其他错误，打印错误消息并返回false
 	fmt.Println("检查路径时发生错误:", err)
 	return false
 }
@@ -35,31 +28,28 @@ func NewConfig(p string) *viper.Viper {
 	return getConfig(envConf, ".")
 }
 
-// setDefaults 设置默认值
 func setDefaults(conf *viper.Viper) {
-
 	// HTTP settings
 	conf.SetDefault("http.host", "0.0.0.0")
 	conf.SetDefault("http.port", 9000)
-	conf.SetDefault("http.title", "Pandora")
+	conf.SetDefault("http.title", "GPT Mirror")
 	conf.SetDefault("http.rate", 100)
 
 	// Database settings
 	conf.SetDefault("database.driver", "sqlite")
 	conf.SetDefault("database.dsn", "./data/data.db")
 
-	// Pandora domain settings
-	conf.SetDefault("pandora.domain.chat", "https://chat.oaifree.com")
-	conf.SetDefault("pandora.domain.token", "https://token.oaifree.com")
-	conf.SetDefault("pandora.domain.index", "https://new.oaifree.com")
-	conf.SetDefault("pandora.domain.claude", "https://demo.fuclaude.com")
-	conf.SetDefault("pandora.account_refresh_cron", "")
+	// Automatic account/share maintenance is disabled until the provider layer
+	// owns credential refresh and remote share/session behavior.
+	conf.SetDefault("account.refresh.enabled", false)
+	conf.SetDefault("account.refresh.cron", "")
+	conf.SetDefault("share.refresh.enabled", false)
 
 	// Share settings
 	conf.SetDefault("share.random", true)
 	conf.SetDefault("share.custom", true)
 
-	// api settings
+	// One API integration settings
 	conf.SetDefault("oneapi.token", "")
 	conf.SetDefault("oneapi.domain", "")
 
@@ -78,23 +68,19 @@ func getConfig(path ...string) *viper.Viper {
 	conf := viper.New()
 	conf.SetConfigName("config")
 	for _, p := range path {
-		// 路径不存在则跳过
 		if !doesPathExist(p) {
 			continue
 		}
 		conf.AddConfigPath(p)
 	}
-	err := conf.ReadInConfig()
-	if err != nil {
+	if err := conf.ReadInConfig(); err != nil {
 		panic(err)
 	}
 	setDefaults(conf)
-	err = conf.BindEnv("security.admin_password", "ADMIN_PASSWORD")
-	if err != nil {
+	if err := conf.BindEnv("security.admin_password", "ADMIN_PASSWORD"); err != nil {
 		return nil
 	}
 	conf.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	// 绑定环境变量
 	conf.AutomaticEnv()
 	conf.WatchConfig()
 	return conf
