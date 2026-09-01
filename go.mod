@@ -3,7 +3,7 @@ module PandoraHelper
 go 1.26
 
 require (
-	github.com/duke-git/lancet/v2 v2.3.0
+	github.com/duke-git/lancet/v2 v2.3.9
 	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-co-op/gocron v1.28.2
@@ -11,13 +11,13 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/wire v0.5.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pquerna/otp v1.4.0
-	github.com/sony/sonyflake v1.1.0
+	github.com/pquerna/otp v1.5.0
+	github.com/sony/sonyflake v1.3.0
 	github.com/spf13/viper v1.16.0
-	github.com/stretchr/testify v1.9.0
-	github.com/swaggo/swag v1.16.2
+	github.com/stretchr/testify v1.12.1
+	github.com/swaggo/swag v1.16.6
 	github.com/ulule/limiter/v3 v3.11.2
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.58.0
 	google.golang.org/grpc v1.55.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -32,7 +32,6 @@ require (
 	github.com/bytedance/sonic v1.11.3 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
@@ -67,7 +66,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
@@ -79,9 +77,12 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20221208152030-732eee02a75a // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
