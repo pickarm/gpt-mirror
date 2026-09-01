@@ -36,6 +36,9 @@ func (*testCredentialProvider) Delete(context.Context, uint) error              
 func (*testCredentialProvider) Validate(context.Context, uint) (credentialprovider.Health, error) {
 	return credentialprovider.Health{State: credentialprovider.StateUnknown}, nil
 }
+func (*testCredentialProvider) RecordHealth(context.Context, uint, credentialprovider.Health) error {
+	return nil
+}
 func (*testCredentialProvider) CanPersist() bool { return true }
 
 type testAccountRepository struct {
