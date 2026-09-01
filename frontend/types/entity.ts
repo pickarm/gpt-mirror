@@ -16,6 +16,7 @@ export interface UserInfo {
 }
 
 export type ProductType = "chatgpt" | "claude";
+export type CredentialState = 'healthy' | 'expired' | 'blocked' | 'unknown';
 
 export interface Organization {
   id: string;
@@ -56,23 +57,24 @@ export interface Role {
 export interface Account {
   id: number;
   email: string;
-  password: string;
   accountType: ProductType;
   createTime?: string;
   updateTime?: string;
   shared?: number;
   shareList?: string;
-  proxyUrl?: string;
+  hasCredential?: boolean;
+  credentialState?: CredentialState;
+  credentialMessage?: string;
+  credentialCheckedAt?: string;
+  proxyConfigured?: boolean;
+  proxyDisplay?: string;
 }
 
 export interface ChatGPTAccount extends Account {
-  refreshToken?: string;
-  accessToken?: string;
-  oneApiChannelId?: number;
+  oneApiChannelId?: string | number;
 }
 
 export interface ClaudeAccount extends Account {
-  sessionKey?: string;
 }
 
 export interface Share {
