@@ -1,6 +1,6 @@
 # GPT Mirror release checklist
 
-This checklist is the release gate for v1.x. A tag must not be promoted as stable while any required item is unresolved.
+This checklist is the release gate for v1.x. A release candidate may be published so that the real packaged images can be validated, but a tag must not be promoted as stable while any required stable-release item is unresolved.
 
 ## 1. Automated gates
 
@@ -35,7 +35,7 @@ This checklist is the release gate for v1.x. A tag must not be promoted as stabl
 
 ## 3. Real-account ChatGPT parity gate
 
-Run with an account/session that the tester is authorized to use. Record only conversation IDs, status classifications and timestamps; never attach tokens or cookies to release evidence.
+Run this against the **published RC images** with an account/session that the tester is authorized to use. Record only conversation IDs, status classifications and timestamps; never attach tokens or cookies to release evidence.
 
 - [ ] account health reports authenticated/healthy.
 - [ ] model list loads.
@@ -50,6 +50,8 @@ Run with an account/session that the tester is authorized to use. Record only co
 - [ ] delete/hide is reflected upstream.
 - [ ] history pagination loads additional upstream pages without duplicate conversation IDs.
 - [ ] temporary-chat behavior is verified separately; until browser support exists, the browser fallback must reject it explicitly rather than persist it silently.
+
+Use `scripts/rc-live-check.sh` for the repeatable API-side lifecycle validation, then separately confirm the same conversation/account state from the normal ChatGPT surface.
 
 ## 4. Failure-mode gate
 
@@ -79,18 +81,18 @@ Run with an account/session that the tester is authorized to use. Record only co
 ## 6. Release procedure
 
 1. Confirm the candidate commit is on `main` and every CI job is green.
-2. Complete the real-account parity and failure-mode sections above.
-3. Update `CHANGELOG.md` from `Unreleased` to the release version/date.
-4. Create an annotated prerelease tag such as `v1.0.0-rc1`.
-5. Push the tag.
-6. Verify the Release workflow publishes both matching GHCR images:
+2. Freeze `CHANGELOG.md` under the intended RC version/date while keeping a new `Unreleased` section.
+3. Preferred automated path: create `release-trigger/v1.0.0-rc1` at the exact `main` release commit. The Release workflow validates that the commit is contained in `main`, publishes both images, smoke-tests the published pair, creates the real `v1.0.0-rc1` prerelease tag/Release, and removes the trigger branch.
+4. Manual fallback: create and push an annotated `v1.0.0-rc1` tag at the same `main` commit; the same Release workflow handles verification, image publication, published-stack smoke, and GitHub prerelease creation.
+5. Verify the RC publishes only the exact prerelease image tag (for example `1.0.0-rc1`); prereleases must not move `1`, `1.0`, or `latest` aliases.
+6. Verify both matching GHCR images exist:
    - `ghcr.io/pickarm/gpt-mirror`
    - `ghcr.io/pickarm/gpt-mirror-browser`
-7. Verify SBOM/provenance metadata is attached to both image builds.
-8. Pull the published RC images on a clean Docker host and repeat the two-container health/readiness/restart smoke checks.
-9. Complete RC regression without expanding feature scope.
-10. Update the changelog and create `v1.0.0` only after the RC gates remain green.
-11. Verify both stable GHCR images and the GitHub Release before marking v1.0 as recommended stable.
+7. Verify SBOM/provenance metadata is attached to both image builds and the published-image Compose smoke is green.
+8. Deploy the published RC on an authorized test environment and complete the real-account parity and failure-mode sections above, including `scripts/rc-live-check.sh` plus manual confirmation from the normal ChatGPT surface.
+9. If an RC regression is found, fix it on `main` and cut `rc2` (or later); do not silently replace an existing RC tag.
+10. Create `v1.0.0` only after the published RC passes real-account parity, proxy/restart/session regression, and documentation gates.
+11. Verify the stable release publishes `1.0.0`, `1.0`, `1`, and `latest` for both images before marking v1.0 as recommended stable.
 
 ## Explicit non-gate for v1.0
 
