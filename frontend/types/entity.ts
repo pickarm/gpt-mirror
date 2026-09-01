@@ -62,6 +62,7 @@ export interface Account {
   updateTime?: string;
   shared?: number;
   shareList?: string;
+  proxyUrl?: string;
 }
 
 export interface ChatGPTAccount extends Account {
@@ -105,7 +106,6 @@ export interface ChatGPTShare extends Share {
   temporaryChat?: boolean;
 }
 
-// share默认值
 export const defaultShare: ChatGPTShare & ClaudeShare = {
   id: undefined,
   accountId: -1,
