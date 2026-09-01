@@ -313,7 +313,10 @@ try {
 console.error(`browser-worker: binding unix://${SOCKET_PATH} display=${process.env.DISPLAY || 'unset'}`);
 server.listen(SOCKET_PATH, () => {
   try {
-    fs.chmodSync(SOCKET_PATH, 0o660);
+    // The socket lives only in a private Docker named volume shared with the
+    // Go application. Both containers intentionally run as different
+    // unprivileged users, so filesystem mode must allow both to connect.
+    fs.chmodSync(SOCKET_PATH, 0o666);
     console.error(`browser-worker: listening unix://${SOCKET_PATH}`);
   } catch (error) {
     console.error(`browser-worker: socket permission setup failed: ${sanitizeError(error)}`);
