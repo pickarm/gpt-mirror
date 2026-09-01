@@ -156,18 +156,23 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 		return err
 	}
 
-	incomingSecret := credentialFromAccount(account)
 	legacySecret := credentialFromAccount(existing)
+	incomingSecret := credentialFromAccount(account)
+	proxyProvided := account.ProxyURL != ""
+	proxyHasCredentials := false
+	if proxyProvided {
+		storedProxy, hasCredentials, err := normalizeAccountProxy(account.ProxyURL)
+		if err != nil {
+			return err
+		}
+		existing.ProxyURL = storedProxy
+		proxyHasCredentials = hasCredentials
+	}
+
 	if !incomingSecret.Empty() && !s.credentialProvider.CanPersist() {
 		return fmt.Errorf("cannot update account credentials: %w", credentialprovider.ErrEncryptionKeyMissing)
 	}
 
-	if account.ProxyURL != "" {
-		if err := validateAccountProxy(account.ProxyURL); err != nil {
-			return err
-		}
-		existing.ProxyURL = account.ProxyURL
-	}
 	existing.Email = account.Email
 	if account.AccountType != "" {
 		existing.AccountType = account.AccountType
@@ -175,8 +180,9 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 	existing.Shared = account.Shared
 	existing.OneApiChannelId = account.OneApiChannelId
 
+	needsSecretMutation := !incomingSecret.Empty() || proxyProvided
 	var secretToPersist credentialprovider.Secret
-	if !incomingSecret.Empty() {
+	if needsSecretMutation {
 		baseSecret, resolveErr := s.credentialProvider.Resolve(ctx, existing.ID)
 		if resolveErr != nil {
 			if !errors.Is(resolveErr, credentialprovider.ErrCredentialNotFound) {
@@ -185,8 +191,15 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 			baseSecret = legacySecret
 		}
 		secretToPersist = mergeCredential(baseSecret, incomingSecret)
+		if proxyProvided && !proxyHasCredentials {
+			secretToPersist.ProxyURL = ""
+		}
 	} else if !legacySecret.Empty() && s.credentialProvider.CanPersist() {
 		secretToPersist = legacySecret
+	}
+
+	if !secretToPersist.Empty() && !s.credentialProvider.CanPersist() {
+		return fmt.Errorf("cannot update account credentials: %w", credentialprovider.ErrEncryptionKeyMissing)
 	}
 
 	if s.credentialProvider.CanPersist() {
@@ -196,6 +209,9 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 	return s.tm.Transaction(ctx, func(txCtx context.Context) error {
 		if err := s.accountRepository.Update(txCtx, existing); err != nil {
 			return err
+		}
+		if needsSecretMutation && secretToPersist.Empty() {
+			return s.credentialProvider.Delete(txCtx, existing.ID)
 		}
 		if !secretToPersist.Empty() {
 			if err := s.credentialProvider.Put(txCtx, existing.ID, secretToPersist); err != nil {
@@ -207,7 +223,8 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 }
 
 func (s *accountService) Create(ctx context.Context, account *model.Account) error {
-	if err := validateAccountProxy(account.ProxyURL); err != nil {
+	storedProxy, _, err := normalizeAccountProxy(account.ProxyURL)
+	if err != nil {
 		return err
 	}
 
@@ -218,6 +235,7 @@ func (s *accountService) Create(ctx context.Context, account *model.Account) err
 
 	persisted := *account
 	clearAccountCredentialFields(&persisted)
+	persisted.ProxyURL = storedProxy
 
 	if err := s.tm.Transaction(ctx, func(txCtx context.Context) error {
 		if err := s.accountRepository.Create(txCtx, &persisted); err != nil {
@@ -227,6 +245,7 @@ func (s *accountService) Create(ctx context.Context, account *model.Account) err
 			if err := s.credentialProvider.Put(txCtx, persisted.ID, secret); err != nil {
 				return err
 			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -235,21 +254,22 @@ func (s *accountService) Create(ctx context.Context, account *model.Account) err
 	return nil
 }
 
-func validateAccountProxy(proxyURL string) error {
+func normalizeAccountProxy(proxyURL string) (string, bool, error) {
 	if proxyURL == "" {
-		return nil
+		return "", false, nil
 	}
-	if _, err := apptransport.ParseProxy(proxyURL); err != nil {
-		return fmt.Errorf("invalid account proxy: %w", err)
+	spec, err := apptransport.ParseProxy(proxyURL)
+	if err != nil {
+		return "", false, fmt.Errorf("invalid account proxy: %w", err)
 	}
-	return nil
+	return spec.Endpoint(), spec.HasCredentials(), nil
 }
 
 func credentialFromAccount(account *model.Account) credentialprovider.Secret {
 	if account == nil {
 		return credentialprovider.Secret{}
 	}
-	return credentialprovider.Secret{
+	secret := credentialprovider.Secret{
 		Representation: credentialprovider.RepresentationLegacyFields,
 		Password:       account.Password,
 		SessionToken:   account.SessionToken,
@@ -257,6 +277,12 @@ func credentialFromAccount(account *model.Account) credentialprovider.Secret {
 		RefreshToken:   account.RefreshToken,
 		SessionKey:     account.SessionKey,
 	}
+	if account.ProxyURL != "" {
+		if spec, err := apptransport.ParseProxy(account.ProxyURL); err == nil && spec.HasCredentials() {
+			secret.ProxyURL = account.ProxyURL
+		}
+	}
+	return secret
 }
 
 func mergeCredential(base credentialprovider.Secret, patch credentialprovider.Secret) credentialprovider.Secret {
@@ -284,6 +310,9 @@ func mergeCredential(base credentialprovider.Secret, patch credentialprovider.Se
 	}
 	if patch.Reference != "" {
 		merged.Reference = patch.Reference
+	}
+	if patch.ProxyURL != "" {
+		merged.ProxyURL = patch.ProxyURL
 	}
 	return merged
 }
