@@ -15,8 +15,9 @@ func TestPrototypeProxiesAnonymousGETWithMechanicalHeaderRewrite(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
-		if r.Host != strings.TrimPrefix(upstreamURLForHost(r), "http://") {
-			// The reverse proxy must present the upstream Host, not the mirror host.
+		if r.Host != "upstream.invalid" {
+			// The reverse proxy must present the logical upstream Host, not the
+			// mirror host or the httptest transport destination.
 			t.Fatalf("unexpected Host: %s", r.Host)
 		}
 		w.Header().Set("Location", "https://upstream.invalid/auth/login")
@@ -27,8 +28,8 @@ func TestPrototypeProxiesAnonymousGETWithMechanicalHeaderRewrite(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	// Use a custom transport that maps the logical upstream.invalid host to the
-	// httptest server while preserving the reverse-proxy URL/Host behavior.
+	// Map the logical upstream.invalid destination to the httptest listener
+	// while preserving req.Host as the value emitted by ReverseProxy.Director.
 	transport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		clone := req.Clone(req.Context())
 		clone.URL.Scheme = "http"
@@ -87,11 +88,4 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
-}
-
-// upstreamURLForHost returns the URL prefix used by the test transport. It is
-// intentionally derived from the request URL so the assertion stays local to
-// the request that reached the test server.
-func upstreamURLForHost(r *http.Request) string {
-	return "http://" + r.Host
 }
