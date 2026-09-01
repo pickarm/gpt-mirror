@@ -55,7 +55,6 @@ export function ShareModal({ title, show, formValue, onOk, onCancel }: ShareModa
     }
   };
 
-
   const limitParser = (value: string | undefined) => {
     switch (value) {
       case '无限制':
@@ -67,7 +66,6 @@ export function ShareModal({ title, show, formValue, onOk, onCancel }: ShareModa
     }
   }
 
-
   return (
     <Modal
       title={title}
@@ -75,7 +73,6 @@ export function ShareModal({ title, show, formValue, onOk, onCancel }: ShareModa
       onOk={onModalOk}
       getContainer={false}
       onCancel={() => {
-        // form.resetFields();
         onCancel();
       }}
       okButtonProps={{
@@ -112,13 +109,12 @@ export function ShareModal({ title, show, formValue, onOk, onCancel }: ShareModa
           </Col>
           {formValue.shareType === 'chatgpt' &&<Col span={12}>
             <Form.Item<AddShareReq> label={t('token.siteLimit')} name="siteLimit">
-              <Input placeholder="eg: https://demo.oaifree.com" />
+              <Input placeholder="eg: https://example.com" />
             </Form.Item>
           </Col>}
         </Row>
         {formValue.shareType === 'chatgpt' &&
           <Space direction={"vertical"} className={'w-full'}>
-            {/*<Alert message="限制模型的使用次数" type="info"/>*/}
             <Typography.Text>模型使用次数限制：</Typography.Text>
             <Row gutter={16}>
               <Col span={8}>
@@ -173,19 +169,18 @@ export function ShareModal({ title, show, formValue, onOk, onCancel }: ShareModa
               </Col>
             </Row>
           </Space>
-
         }
 
         {formValue.shareType === 'chatgpt' && <Row>
           <Col span={8}>
             <Form.Item<AddShareReq>
               label={
-                <LabelWithInfo label={t('token.refreshEveryday')} info="刷新次数限制的频率, 勾选后将每天刷新上面设置的限额次数" />
+                <LabelWithInfo label={t('token.refreshEveryday')} info="Provider 接入完成前不会执行远端刷新；该值仅保留用于兼容已有配置" />
               }
               name="refreshEveryday"
               valuePropName="checked"
             >
-              <Checkbox />
+              <Checkbox disabled />
             </Form.Item>
           </Col>
           <Col span={5}>
