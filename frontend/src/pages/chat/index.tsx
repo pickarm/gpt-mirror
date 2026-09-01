@@ -5,6 +5,7 @@ import {
   Empty,
   Input,
   List,
+  Popconfirm,
   Select,
   Space,
   Spin,
@@ -32,6 +33,8 @@ function ChatPage() {
   const [models, setModels] = useState<ChatGPTModel[]>([]);
   const [model, setModel] = useState('auto');
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [historyCursor, setHistoryCursor] = useState('');
+  const [historyHasMore, setHistoryHasMore] = useState(false);
   const [conversation, setConversation] = useState<Conversation>();
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,8 +60,21 @@ function ChatPage() {
     if (!accountId) return;
     setConversation(undefined);
     setModels([]);
+    setConversations([]);
+    setHistoryCursor('');
+    setHistoryHasMore(false);
     loadAccount(accountId);
   }, [accountId]);
+
+  const applyHistoryPage = (page: Awaited<ReturnType<typeof chatgptService.listConversations>>, append = false) => {
+    setConversations((current) => {
+      if (!append) return page.items;
+      const seen = new Set(current.map((item) => item.id));
+      return [...current, ...page.items.filter((item) => !seen.has(item.id))];
+    });
+    setHistoryCursor(page.nextCursor || '');
+    setHistoryHasMore(page.hasMore);
+  };
 
   const loadAccount = async (id: number) => {
     setHistoryLoading(true);
@@ -68,7 +84,7 @@ function ChatPage() {
         chatgptService.listConversations(id),
       ]);
       setModels(availableModels);
-      setConversations(page.items);
+      applyHistoryPage(page);
       const preferred = availableModels.find((item) => item.slug === 'auto' || item.id === 'auto');
       if (preferred) setModel(preferred.slug || preferred.id);
       else if (availableModels.length > 0) setModel(availableModels[0].slug || availableModels[0].id);
@@ -94,9 +110,25 @@ function ChatPage() {
   };
 
   const refreshHistory = async () => {
-    if (!accountId) return;
-    const page = await chatgptService.listConversations(accountId);
-    setConversations(page.items);
+    if (!accountId || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const page = await chatgptService.listConversations(accountId);
+      applyHistoryPage(page);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const loadMoreHistory = async () => {
+    if (!accountId || !historyHasMore || !historyCursor || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const page = await chatgptService.listConversations(accountId, historyCursor);
+      applyHistoryPage(page, true);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const send = async () => {
@@ -185,10 +217,16 @@ function ChatPage() {
   };
 
   const deleteCurrent = async () => {
-    if (!accountId || !conversation?.id) return;
-    await chatgptService.deleteConversation(accountId, conversation.id);
-    setConversation(undefined);
-    await refreshHistory();
+    if (!accountId || !conversation?.id || loading) return;
+    setLoading(true);
+    try {
+      await chatgptService.deleteConversation(accountId, conversation.id);
+      setConversation(undefined);
+      await refreshHistory();
+      antdMessage.success('Conversation deleted');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -242,10 +280,10 @@ function ChatPage() {
 
             <div style={{ marginTop: 18, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
               <Text strong>Cloud history</Text>
-              <Button size="small" type="text" onClick={refreshHistory}>Refresh</Button>
+              <Button size="small" type="text" loading={historyLoading} onClick={refreshHistory}>Refresh</Button>
             </div>
 
-            <Spin spinning={historyLoading}>
+            <Spin spinning={historyLoading && conversations.length === 0}>
               <List
                 size="small"
                 dataSource={conversations}
@@ -262,6 +300,18 @@ function ChatPage() {
                   </List.Item>
                 )}
               />
+              {historyHasMore && (
+                <Button
+                  block
+                  type="text"
+                  loading={historyLoading}
+                  disabled={!historyCursor}
+                  onClick={loadMoreHistory}
+                  style={{ marginTop: 8 }}
+                >
+                  Load more
+                </Button>
+              )}
             </Spin>
           </aside>
 
@@ -271,7 +321,18 @@ function ChatPage() {
                 <Text strong>{conversation?.title || 'New chat'}</Text>
                 {conversation?.id && <Text type="secondary" style={{ marginLeft: 10, fontSize: 11 }}>{conversation.id}</Text>}
               </div>
-              {conversation?.id && <Button danger type="text" onClick={deleteCurrent}>Delete</Button>}
+              {conversation?.id && (
+                <Popconfirm
+                  title="Delete this cloud conversation?"
+                  description="This action is sent to the selected ChatGPT account and cannot be undone from GPT Mirror."
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                  cancelText="Cancel"
+                  onConfirm={deleteCurrent}
+                >
+                  <Button danger type="text" disabled={loading}>Delete</Button>
+                </Popconfirm>
+              )}
             </div>
 
             <div style={{ overflow: 'auto', padding: '24px clamp(18px, 8vw, 120px)' }}>
@@ -311,7 +372,7 @@ function ChatPage() {
                 </Button>
               </Space.Compact>
               <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 11 }}>
-                Messages are written to the selected ChatGPT account. Browser-challenged sessions may require a future browser-backed adapter.
+                Messages are written to the selected ChatGPT account. The canonical Compose stack uses the isolated browser worker for browser-sensitive writes.
               </Text>
             </div>
           </main>
