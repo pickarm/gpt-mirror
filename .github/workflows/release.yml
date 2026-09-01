@@ -47,16 +47,19 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: pnpm build
-      - name: Validate root Compose release entrypoint
+      - name: Validate source and registry Compose entrypoints
         shell: bash
         run: |
           cat >/tmp/gpt-mirror-release.env <<'EOF'
           ADMIN_PASSWORD=release-validation-password
           SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           GPT_MIRROR_PORT=19001
+          CHATGPT_BROWSER_ENABLED=true
+          GPT_MIRROR_VERSION=1.0.0-test
           TRANSPORT_PROXY_URL=
           EOF
           docker compose --env-file /tmp/gpt-mirror-release.env -f compose.yaml config >/dev/null
+          docker compose --env-file /tmp/gpt-mirror-release.env -f compose.registry.yaml config >/dev/null
 
   publish-images:
     name: Publish GHCR images
@@ -117,9 +120,58 @@ jobs:
           provenance: mode=max
           sbom: true
 
+  published-stack-smoke:
+    name: Smoke published GHCR stack
+    needs: publish-images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull and start matching published images
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cat >/tmp/gpt-mirror-published.env <<EOF
+          ADMIN_PASSWORD=release-validation-password
+          SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          GPT_MIRROR_PORT=19002
+          CHATGPT_BROWSER_ENABLED=true
+          GPT_MIRROR_VERSION=$version
+          TRANSPORT_PROXY_URL=
+          EOF
+
+          cleanup() {
+            docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml ps -a || true
+            docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml logs --no-color || true
+            docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml down -v >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml pull
+          docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml up -d
+
+          for _ in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:19002/readiness | grep -q 'ready'; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          curl --fail --silent http://127.0.0.1:19002/health | grep -q 'healthy'
+          curl --fail --silent http://127.0.0.1:19002/readiness | grep -q 'ready'
+          docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml exec -T browser-worker node -e "const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>process.exit(x.statusCode===200?0:1));r.on('error',()=>process.exit(1));"
+          docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml exec -T gpt-mirror test -f /app/data/config.json
+          docker compose --env-file /tmp/gpt-mirror-published.env -f compose.registry.yaml exec -T gpt-mirror test -f /app/data/data.db
+
   github-release:
     name: Publish GitHub Release
-    needs: publish-images
+    needs: published-stack-smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
