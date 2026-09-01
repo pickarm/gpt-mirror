@@ -1,19 +1,61 @@
 package v1
 
-import "PandoraHelper/internal/model"
+import (
+	"PandoraHelper/internal/model"
+	"time"
+)
 
 type SearchAccountRequest struct {
 	Email       string `json:"email" example:"1234@gmail.com"`
-	AccountType string `json:"accountType" example:"1234@gmail.com"`
+	AccountType string `json:"accountType" example:"chatgpt"`
 }
 
-type AddAccountRequest struct {
-	//Account的所有属性
-	model.Account `json:"account" binding:"required"`
+// AccountWriteRequest is the only HTTP DTO that accepts account credential
+// material. model.Account itself never serializes secrets.
+type AccountWriteRequest struct {
+	ID              uint   `json:"id"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	SessionToken    string `json:"sessionToken"`
+	AccessToken     string `json:"accessToken"`
+	Shared          int    `json:"shared"`
+	RefreshToken    string `json:"refreshToken"`
+	AccountType     string `json:"accountType"`
+	SessionKey      string `json:"sessionKey"`
+	OneApiChannelId string `json:"oneApiChannelId"`
+	ProxyURL        string `json:"proxyUrl"`
 }
 
-type UpdateAccountRequest struct {
-	Account model.Account `json:"account" binding:"required"`
+func (r *AccountWriteRequest) ToModel() *model.Account {
+	return &model.Account{
+		ID:              r.ID,
+		Email:           r.Email,
+		Password:        r.Password,
+		SessionToken:    r.SessionToken,
+		AccessToken:     r.AccessToken,
+		Shared:          r.Shared,
+		RefreshToken:    r.RefreshToken,
+		AccountType:     r.AccountType,
+		SessionKey:      r.SessionKey,
+		OneApiChannelId: r.OneApiChannelId,
+		ProxyURL:        r.ProxyURL,
+	}
+}
+
+type AccountSummary struct {
+	ID                uint             `json:"id"`
+	Email             string           `json:"email"`
+	AccountType       string           `json:"accountType"`
+	CreateTime        *model.LocalTime `json:"createTime,omitempty"`
+	UpdateTime        *model.LocalTime `json:"updateTime,omitempty"`
+	Shared            int              `json:"shared"`
+	OneApiChannelId   string           `json:"oneApiChannelId,omitempty"`
+	HasCredential     bool             `json:"hasCredential"`
+	CredentialState   string           `json:"credentialState"`
+	CredentialMessage string           `json:"credentialMessage,omitempty"`
+	CredentialChecked *time.Time       `json:"credentialCheckedAt,omitempty"`
+	ProxyConfigured   bool             `json:"proxyConfigured"`
+	ProxyDisplay      string           `json:"proxyDisplay,omitempty"`
 }
 
 type DeleteAccountRequest struct {
@@ -32,7 +74,7 @@ type LoginShareAccountRequest struct {
 
 type SearchAccountResponseData struct {
 	Response
-	Data []*model.Account `json:"data"`
+	Data []*AccountSummary `json:"data"`
 }
 
 type AccountResponseData struct {
