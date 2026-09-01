@@ -42,6 +42,15 @@ jobs:
             echo "Sensitive Account field became JSON-serializable. Use an explicit write DTO and redacted read model."
             exit 1
           fi
+      - name: Keep conversation persistence metadata-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='^[[:space:]]*(UserMessage|AssistantMessage|Prompt|Content)[[:space:]]+'
+          if grep -n -E "$pattern" internal/model/conversation.go; then
+            echo "Conversation content must remain upstream-owned; local persistence may store metadata only."
+            exit 1
+          fi
 
   backend:
     name: Go build and tests
