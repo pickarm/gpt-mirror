@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	apptransport "PandoraHelper/internal/transport"
 )
@@ -219,5 +219,3 @@ func mustURL(t *testing.T, raw string) *url.URL {
 	}
 	return u
 }
-
-var _ = time.Second
