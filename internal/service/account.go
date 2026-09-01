@@ -304,6 +304,7 @@ func credentialFromAccount(account *model.Account) credentialprovider.Secret {
 		AccessToken:    account.AccessToken,
 		RefreshToken:   account.RefreshToken,
 		SessionKey:     account.SessionKey,
+		Cookie:         account.Cookie,
 	}
 	if account.ProxyURL != "" {
 		if spec, err := apptransport.ParseProxy(account.ProxyURL); err == nil && spec.HasCredentials() {
@@ -351,6 +352,7 @@ func clearAccountCredentialFields(account *model.Account) {
 	account.AccessToken = ""
 	account.RefreshToken = ""
 	account.SessionKey = ""
+	account.Cookie = ""
 }
 
 func (s *accountService) SearchAccount(ctx context.Context, accountType string, keyword string) ([]*v1.AccountSummary, error) {
