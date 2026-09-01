@@ -92,6 +92,24 @@ func TestRewriteResponseHeadersOnlyChangesSafeMechanicalFields(t *testing.T) {
 	}
 }
 
+func TestRewriteLocationOnlyMapsStrictSameOriginRedirects(t *testing.T) {
+	upstream, _ := url.Parse("https://chatgpt.com:8443")
+	mirror, _ := url.Parse("https://mirror.example.com")
+
+	if got := webmirror.RewriteLocation("https://chatgpt.com:8443/c/123", upstream, mirror); got != "https://mirror.example.com/c/123" {
+		t.Fatalf("same-origin Location = %q", got)
+	}
+	for _, external := range []string{
+		"https://chatgpt.com/c/123",
+		"http://chatgpt.com:8443/c/123",
+		"https://chatgpt.com:9443/c/123",
+	} {
+		if got := webmirror.RewriteLocation(external, upstream, mirror); got != external {
+			t.Fatalf("cross-origin Location %q was rewritten to %q", external, got)
+		}
+	}
+}
+
 func TestProbeDoesNotFollowRedirects(t *testing.T) {
 	var destinationHits int
 	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
