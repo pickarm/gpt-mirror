@@ -10,6 +10,7 @@ import (
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
+	apptransport "PandoraHelper/internal/transport"
 	"PandoraHelper/pkg/app"
 	"PandoraHelper/pkg/jwt"
 	"PandoraHelper/pkg/log"
@@ -29,10 +30,11 @@ var repositorySet = wire.NewSet(
 )
 
 var providerSet = wire.NewSet(
-	chatgptprovider.NewUnavailableProvider,
+	apptransport.NewFactoryFromViper,
 	credentialprovider.NewCipher,
 	credentialprovider.NewUnavailableValidator,
 	credentialprovider.NewProvider,
+	chatgptprovider.NewWebProvider,
 )
 
 var serviceCoordinatorSet = wire.NewSet(
