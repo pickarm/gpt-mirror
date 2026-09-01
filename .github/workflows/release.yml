@@ -140,7 +140,7 @@ jobs:
       - name: Build and push server image (attempt 1)
         id: server_build_primary
         continue-on-error: true
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -155,7 +155,7 @@ jobs:
         run: sleep 20
       - name: Build and push server image (retry)
         if: ${{ steps.server_build_primary.outcome == 'failure' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -194,7 +194,7 @@ jobs:
       - name: Build and push browser worker image (attempt 1)
         id: browser_build_primary
         continue-on-error: true
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./browser-worker/Dockerfile
@@ -209,7 +209,7 @@ jobs:
         run: sleep 20
       - name: Build and push browser worker image (retry)
         if: ${{ steps.browser_build_primary.outcome == 'failure' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./browser-worker/Dockerfile
