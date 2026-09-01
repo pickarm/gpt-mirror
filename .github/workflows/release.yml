@@ -72,10 +72,9 @@ jobs:
             echo "Release commit must already be contained in main."
             exit 1
           }
-          grep -Fq "## [${{ needs.context.outputs.version }}]" CHANGELOG.md || {
-            echo "CHANGELOG.md does not contain release ${{
-              needs.context.outputs.version
-            }}."
+          version="${{ needs.context.outputs.version }}"
+          grep -Fq "## [$version]" CHANGELOG.md || {
+            echo "CHANGELOG.md does not contain release $version."
             exit 1
           }
       - uses: actions/setup-go@v7
