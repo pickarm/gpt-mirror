@@ -42,6 +42,24 @@ jobs:
             echo "Sensitive Account field became JSON-serializable. Use an explicit write DTO and redacted read model."
             exit 1
           fi
+      - name: Reject production-shaped credentials in fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='sk-(proj-)?[A-Za-z0-9_-]{40,}|__Secure-next-auth\.session-token=[^[:space:]";]{60,}|Bearer[[:space:]]+[A-Za-z0-9._~+/-]{80,}'
+          if git grep -n -E "$pattern" -- test data; then
+            echo "Production-shaped credential found in a test fixture or checked-in data file. Use short synthetic values."
+            exit 1
+          fi
+      - name: Reject wholesale HTTP client response logging
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='zap\.Any\("[^"]+",[[:space:]]*(res|resp|response)\)'
+          if git grep -n -E "$pattern" -- internal; then
+            echo "Potential secret-bearing HTTP response is logged wholesale. Log status/typed metadata only."
+            exit 1
+          fi
       - name: Keep conversation persistence metadata-only
         shell: bash
         run: |

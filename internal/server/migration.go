@@ -4,9 +4,11 @@ import (
 	"PandoraHelper/internal/model"
 	credentialprovider "PandoraHelper/internal/provider/credential"
 	"PandoraHelper/internal/repository"
+	apptransport "PandoraHelper/internal/transport"
 	"PandoraHelper/pkg/log"
 	"context"
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -58,22 +60,20 @@ func (m *Migrate) Start(ctx context.Context) error {
 func (m *Migrate) migrateLegacyCredentials(ctx context.Context) error {
 	var accounts []model.Account
 	if err := m.db.WithContext(ctx).
-		Where("COALESCE(password, '') <> '' OR COALESCE(session_token, '') <> '' OR COALESCE(access_token, '') <> '' OR COALESCE(refresh_token, '') <> '' OR COALESCE(session_key, '') <> ''").
+		Where("COALESCE(password, '') <> '' OR COALESCE(session_token, '') <> '' OR COALESCE(access_token, '') <> '' OR COALESCE(refresh_token, '') <> '' OR COALESCE(session_key, '') <> '' OR COALESCE(proxy_url, '') <> ''").
 		Find(&accounts).Error; err != nil {
 		return fmt.Errorf("find legacy account credentials: %w", err)
 	}
 	if len(accounts) == 0 {
 		return nil
 	}
-	if !m.credentialProvider.CanPersist() {
-		m.log.Warn(
-			"legacy account credentials remain in plaintext until security.credential_key is configured",
-			zap.Int("accounts", len(accounts)),
-		)
-		return nil
-	}
 
-	migrated := 0
+	type migrationCandidate struct {
+		account      model.Account
+		secret       credentialprovider.Secret
+		proxyEndpoint string
+	}
+	candidates := make([]migrationCandidate, 0, len(accounts))
 	for i := range accounts {
 		account := accounts[i]
 		secret := credentialprovider.Secret{
@@ -84,20 +84,58 @@ func (m *Migrate) migrateLegacyCredentials(ctx context.Context) error {
 			RefreshToken:   account.RefreshToken,
 			SessionKey:     account.SessionKey,
 		}
+		proxyEndpoint := account.ProxyURL
+		if strings.TrimSpace(account.ProxyURL) != "" {
+			spec, err := apptransport.ParseProxy(account.ProxyURL)
+			if err != nil {
+				// Old databases may contain arbitrary proxy strings. Only block
+				// startup when the value contains userinfo, because leaving a
+				// credential-shaped invalid proxy in plaintext would violate the
+				// secret-handling policy.
+				if strings.Contains(account.ProxyURL, "@") {
+					return fmt.Errorf("cannot safely migrate authenticated proxy for account %d: %s", account.ID, apptransport.RedactProxyURL(account.ProxyURL))
+				}
+			} else {
+				proxyEndpoint = spec.Endpoint()
+				if spec.HasCredentials() {
+					secret.ProxyURL = account.ProxyURL
+				}
+			}
+		}
 		if secret.Empty() {
 			continue
 		}
+		candidates = append(candidates, migrationCandidate{account: account, secret: secret, proxyEndpoint: proxyEndpoint})
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	if !m.credentialProvider.CanPersist() {
+		m.log.Warn(
+			"legacy account or proxy credentials remain in plaintext until security.credential_key is configured",
+			zap.Int("accounts", len(candidates)),
+		)
+		return nil
+	}
 
+	migrated := 0
+	for i := range candidates {
+		candidate := candidates[i]
+		account := candidate.account
 		if err := m.tm.Transaction(ctx, func(txCtx context.Context) error {
+			merged := candidate.secret
 			status, err := m.credentialProvider.Status(txCtx, account.ID)
 			if err != nil {
 				return err
 			}
 			if status.HasCredential {
-				if _, err := m.credentialProvider.Resolve(txCtx, account.ID); err != nil {
+				existing, err := m.credentialProvider.Resolve(txCtx, account.ID)
+				if err != nil {
 					return fmt.Errorf("verify existing encrypted credential for account %d: %w", account.ID, err)
 				}
-			} else if err := m.credentialProvider.Put(txCtx, account.ID, secret); err != nil {
+				merged = mergeMigratedCredential(existing, candidate.secret)
+			}
+			if err := m.credentialProvider.Put(txCtx, account.ID, merged); err != nil {
 				return fmt.Errorf("encrypt legacy credential for account %d: %w", account.ID, err)
 			}
 
@@ -106,6 +144,7 @@ func (m *Migrate) migrateLegacyCredentials(ctx context.Context) error {
 			account.AccessToken = ""
 			account.RefreshToken = ""
 			account.SessionKey = ""
+			account.ProxyURL = candidate.proxyEndpoint
 			if err := m.accountRepository.Update(txCtx, &account); err != nil {
 				return fmt.Errorf("clear legacy credential columns for account %d: %w", account.ID, err)
 			}
@@ -118,6 +157,38 @@ func (m *Migrate) migrateLegacyCredentials(ctx context.Context) error {
 
 	m.log.Info("legacy credential migration complete", zap.Int("accounts", migrated))
 	return nil
+}
+
+func mergeMigratedCredential(base, legacy credentialprovider.Secret) credentialprovider.Secret {
+	merged := base
+	if merged.Representation == "" {
+		merged.Representation = legacy.Representation
+	}
+	if legacy.Password != "" {
+		merged.Password = legacy.Password
+	}
+	if legacy.SessionToken != "" {
+		merged.SessionToken = legacy.SessionToken
+	}
+	if legacy.AccessToken != "" {
+		merged.AccessToken = legacy.AccessToken
+	}
+	if legacy.RefreshToken != "" {
+		merged.RefreshToken = legacy.RefreshToken
+	}
+	if legacy.SessionKey != "" {
+		merged.SessionKey = legacy.SessionKey
+	}
+	if legacy.Cookie != "" {
+		merged.Cookie = legacy.Cookie
+	}
+	if legacy.Reference != "" {
+		merged.Reference = legacy.Reference
+	}
+	if legacy.ProxyURL != "" {
+		merged.ProxyURL = legacy.ProxyURL
+	}
+	return merged
 }
 
 func (m *Migrate) Stop(ctx context.Context) error {

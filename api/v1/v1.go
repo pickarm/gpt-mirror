@@ -1,6 +1,7 @@
 package v1
 
 import (
+	appsecurity "PandoraHelper/internal/security"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -27,11 +28,15 @@ func HandleError(ctx *gin.Context, httpCode int, err error, data interface{}) {
 	if data == nil {
 		data = map[string]string{}
 	}
-	resp := Response{Code: errorCodeMap[err], Message: err.Error(), Data: data}
-	if _, ok := errorCodeMap[ErrSuccess]; !ok {
-		resp = Response{Code: 500, Message: "unknown error", Data: data}
+	code := 500
+	message := "unknown error"
+	if err != nil {
+		message = appsecurity.RedactText(err.Error())
+		if mapped, ok := errorCodeMap[err]; ok {
+			code = mapped
+		}
 	}
-	ctx.JSON(httpCode, resp)
+	ctx.JSON(httpCode, Response{Code: code, Message: message, Data: data})
 }
 
 type Error struct {
