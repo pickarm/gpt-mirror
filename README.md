@@ -45,9 +45,27 @@ GPT Mirror
 chatgpt.com
 ```
 
-## Roadmap
+## Project docs
 
-The detailed roadmap and architecture notes are being prepared in the bootstrap PR.
+- [Roadmap](ROADMAP.md)
+- [Target architecture](docs/ARCHITECTURE.md)
+- [PandoraHelper upstream/import strategy](docs/UPSTREAM.md)
+
+## Initial work queue
+
+1. [#1 — Import and pin PandoraHelper baseline](../../issues/1)
+2. [#2 — Add baseline CI and smoke tests](../../issues/2)
+3. [#3 — Remove hard-coded oaifree/Pandora coupling](../../issues/3)
+4. [#4 — Introduce ChatGPT Provider interface and mocks](../../issues/4)
+5. [#5 — Build outbound transport and proxy layer](../../issues/5)
+6. [#6 — Replace legacy token refresh with session/credential providers](../../issues/6)
+7. [#7 — Implement account-backed conversation lifecycle](../../issues/7)
+8. [#8 — Research and prototype official Web mirror compatibility](../../issues/8)
+
+Cross-cutting work:
+
+- [#9 — Credential and secret-handling policy](../../issues/9)
+- [#10 — Dependency modernization in isolated PRs](../../issues/10)
 
 ## Upstream acknowledgement
 
