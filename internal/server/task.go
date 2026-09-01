@@ -71,27 +71,40 @@ func (t *Task) Start(ctx context.Context) error {
 
 	t.scheduler = gocron.NewScheduler(time.UTC)
 
-	var refreshCron = t.conf.GetString("pandora.account_refresh_cron")
-	t.log.Info("refresh cron with second is:" + refreshCron)
-	var err error
-	if refreshCron != "" {
-		_, err = t.scheduler.CronWithSeconds(refreshCron).Do(t.RefreshAllAccountEveryday, ctx)
+	if t.conf.GetBool("account.refresh.enabled") {
+		refreshCron := t.conf.GetString("account.refresh.cron")
+		t.log.Info("automatic account refresh enabled", zap.String("cron", refreshCron))
+		var err error
+		if refreshCron != "" {
+			_, err = t.scheduler.CronWithSeconds(refreshCron).Do(t.RefreshAllAccountEveryday, ctx)
+		} else {
+			_, err = t.scheduler.Every(1).Day().At("00:00").Do(t.RefreshAllAccountEveryday, ctx)
+		}
+		if err != nil {
+			return err
+		}
 	} else {
-		_, err = t.scheduler.Every(1).Day().At("00:00").Do(t.RefreshAllAccountEveryday, ctx)
+		t.log.Info("automatic account refresh disabled until a credential provider is configured")
 	}
-	if err != nil {
-		return err
-	}
-	_, err = t.scheduler.Every(1).Day().At("00:05").Do(t.RefreshShareLimitEveryday, ctx)
-	if err != nil {
-		return err
+
+	if t.conf.GetBool("share.refresh.enabled") {
+		_, err := t.scheduler.Every(1).Day().At("00:05").Do(t.RefreshShareLimitEveryday, ctx)
+		if err != nil {
+			return err
+		}
+		t.log.Info("automatic share refresh enabled")
+	} else {
+		t.log.Info("automatic share refresh disabled until a provider is configured")
 	}
 
 	t.scheduler.StartBlocking()
 	return nil
 }
+
 func (t *Task) Stop(ctx context.Context) error {
-	t.scheduler.Stop()
+	if t.scheduler != nil {
+		t.scheduler.Stop()
+	}
 	t.log.Info("Task stop...")
 	return nil
 }
