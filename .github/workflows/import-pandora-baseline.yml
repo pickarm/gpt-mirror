@@ -1,0 +1,42 @@
+name: Import PandoraHelper baseline
+
+on:
+  push:
+    branches:
+      - baseline/pandorahelper-f6275d3
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GPT Mirror
+        uses: actions/checkout@v4
+        with:
+          ref: baseline/pandorahelper-f6275d3
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Import pinned PandoraHelper baseline
+        run: bash scripts/import-pandora-baseline.sh
+
+      - name: Commit imported baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No baseline changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: import PandoraHelper f6275d3 baseline [skip ci]"
+          git push origin HEAD:baseline/pandorahelper-f6275d3
