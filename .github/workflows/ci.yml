@@ -167,26 +167,29 @@ jobs:
           ! grep -Eqi 'oaifree|fuclaude' "$workdir/server.log"
 
   docker:
-    name: Release Docker image and Compose smoke
+    name: Release Docker Compose smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Validate Compose configuration
-        run: docker compose --env-file deploy/docker-compose/.env.example -f deploy/docker-compose/docker-compose.yml config >/tmp/compose.yml
-      - name: Build source-first Docker image
-        run: docker build -t gpt-mirror:ci .
-      - name: Start release image
+      - name: Prepare release Compose environment
+        shell: bash
+        run: |
+          cat >/tmp/gpt-mirror-ci.env <<'EOF'
+          ADMIN_PASSWORD=ci-release-password
+          SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          GPT_MIRROR_PORT=19001
+          TRANSPORT_PROXY_URL=
+          EOF
+      - name: Validate canonical root Compose configuration
+        run: docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml config >/tmp/compose.yml
+      - name: Start canonical release deployment
         shell: bash
         run: |
           set -euo pipefail
-          docker run -d --name gpt-mirror-ci \
-            -p 19001:9000 \
-            -e ADMIN_PASSWORD=ci-release-password \
-            -e SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-            gpt-mirror:ci
-          trap 'docker logs gpt-mirror-ci || true; docker rm -f gpt-mirror-ci >/dev/null 2>&1 || true' EXIT
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml up -d --build
+          trap 'docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml logs || true; docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml down -v >/dev/null 2>&1 || true' EXIT
 
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
               break
             fi
@@ -195,4 +198,5 @@ jobs:
 
           curl --fail --silent http://127.0.0.1:19001/health | grep -q 'healthy'
           curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'
-          docker exec gpt-mirror-ci test -f /app/data/config.json
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/config.json
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/data.db
