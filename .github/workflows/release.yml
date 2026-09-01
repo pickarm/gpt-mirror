@@ -112,10 +112,11 @@ jobs:
           docker compose --env-file /tmp/gpt-mirror-release.env -f compose.yaml config >/dev/null
           docker compose --env-file /tmp/gpt-mirror-release.env -f compose.registry.yaml config >/dev/null
 
-  publish-images:
-    name: Publish GHCR images
+  publish-server:
+    name: Publish server GHCR image
     needs: [context, verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
@@ -126,7 +127,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Generate server image metadata
         id: server-meta
         uses: docker/metadata-action@v5
@@ -137,7 +137,24 @@ jobs:
             type=raw,value=${{ needs.context.outputs.major_minor }},enable=${{ needs.context.outputs.prerelease == 'false' }}
             type=raw,value=${{ needs.context.outputs.major }},enable=${{ needs.context.outputs.prerelease == 'false' }}
             type=raw,value=latest,enable=${{ needs.context.outputs.prerelease == 'false' }}
-      - name: Build and push server image
+      - name: Build and push server image (attempt 1)
+        id: server_build_primary
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.server-meta.outputs.tags }}
+          labels: ${{ steps.server-meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+      - name: Back off before server image retry
+        if: ${{ steps.server_build_primary.outcome == 'failure' }}
+        run: sleep 20
+      - name: Build and push server image (retry)
+        if: ${{ steps.server_build_primary.outcome == 'failure' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -149,6 +166,21 @@ jobs:
           provenance: mode=max
           sbom: true
 
+  publish-browser:
+    name: Publish browser-worker GHCR image
+    needs: [context, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate browser worker image metadata
         id: browser-meta
         uses: docker/metadata-action@v5
@@ -159,7 +191,24 @@ jobs:
             type=raw,value=${{ needs.context.outputs.major_minor }},enable=${{ needs.context.outputs.prerelease == 'false' }}
             type=raw,value=${{ needs.context.outputs.major }},enable=${{ needs.context.outputs.prerelease == 'false' }}
             type=raw,value=latest,enable=${{ needs.context.outputs.prerelease == 'false' }}
-      - name: Build and push browser worker image
+      - name: Build and push browser worker image (attempt 1)
+        id: browser_build_primary
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./browser-worker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.browser-meta.outputs.tags }}
+          labels: ${{ steps.browser-meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+      - name: Back off before browser-worker image retry
+        if: ${{ steps.browser_build_primary.outcome == 'failure' }}
+        run: sleep 20
+      - name: Build and push browser worker image (retry)
+        if: ${{ steps.browser_build_primary.outcome == 'failure' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -173,7 +222,7 @@ jobs:
 
   published-stack-smoke:
     name: Smoke published GHCR stack
-    needs: [context, publish-images]
+    needs: [context, publish-server, publish-browser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
