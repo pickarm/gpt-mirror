@@ -1,12 +1,22 @@
-version: '3'
-
 services:
-  pandora-next:
-    image: q11391/pandora-helper
-    container_name: PandoraHelper
-    network_mode: bridge
-    restart: always
+  gpt-mirror:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: gpt-mirror:local
+    container_name: gpt-mirror
+    restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "${GPT_MIRROR_PORT:-9000}:9000"
+    environment:
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
+      SECURITY_CREDENTIAL_KEY: "${SECURITY_CREDENTIAL_KEY:?set SECURITY_CREDENTIAL_KEY in .env}"
+      TRANSPORT_PROXY_URL: "${TRANSPORT_PROXY_URL:-}"
     volumes:
       - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9000/readiness"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
