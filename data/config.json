@@ -20,7 +20,7 @@
   },
   "chatgpt": {
     "base_url": "https://chatgpt.com",
-    "conversation_path": "/backend-api/f/conversation",
+    "conversation_path": "",
     "user_agent": ""
   },
   "moderation": {
