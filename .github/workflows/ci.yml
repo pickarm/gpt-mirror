@@ -75,18 +75,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.7'
           cache: true
       - name: Download dependencies
         run: go mod download
-      - name: Run tests
-        run: go test ./test/server/...
+      - name: Run full Go test suite
+        run: go test ./...
       - name: Build server
-        run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/gpt-mirror ./cmd/server
       - name: Build web mirror probe
-        run: go build -ldflags='-s -w' -o /tmp/webmirror-probe ./cmd/webmirror-probe
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/webmirror-probe ./cmd/webmirror-probe
 
   frontend:
     name: Frontend build
@@ -114,12 +114,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.7'
           cache: true
       - name: Build server
-        run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/gpt-mirror ./cmd/server
       - name: Start from a fresh data directory without legacy upstreams
         shell: bash
         run: |
@@ -137,7 +137,7 @@ jobs:
 
           (
             cd "$workdir"
-            /tmp/PandoraHelper -conf "$workdir/data/" >server.log 2>&1 &
+            /tmp/gpt-mirror -conf "$workdir/data/" >server.log 2>&1 &
             echo $! >server.pid
           )
 
@@ -157,21 +157,32 @@ jobs:
           ! grep -Eqi 'oaifree|fuclaude' "$workdir/server.log"
 
   docker:
-    name: Docker image build
+    name: Release Docker image and Compose smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.7'
-          cache: true
-      - name: Build Linux binaries expected by upstream Dockerfile
+      - name: Validate Compose configuration
+        run: docker compose --env-file deploy/docker-compose/.env.example -f deploy/docker-compose/docker-compose.yml config >/tmp/compose.yml
+      - name: Build source-first Docker image
+        run: docker build -t gpt-mirror:ci .
+      - name: Start release image
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p builds/PandoraHelper-ci-linux-amd64
-          mkdir -p builds/PandoraHelper-ci-linux-arm64
-          GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o builds/PandoraHelper-ci-linux-amd64/PandoraHelper ./cmd/server
-          GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -o builds/PandoraHelper-ci-linux-arm64/PandoraHelper ./cmd/server
-      - name: Build Docker image
-        run: docker build -f deploy/build/Dockerfile --build-arg VERSION=ci --build-arg TARGETPLATFORM=linux/amd64 -t gpt-mirror:ci .
+          docker run -d --name gpt-mirror-ci \
+            -p 19001:9000 \
+            -e ADMIN_PASSWORD=ci-release-password \
+            -e SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            gpt-mirror:ci
+          trap 'docker logs gpt-mirror-ci || true; docker rm -f gpt-mirror-ci >/dev/null 2>&1 || true' EXIT
+
+          for _ in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          curl --fail --silent http://127.0.0.1:19001/health | grep -q 'healthy'
+          curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'
+          docker exec gpt-mirror-ci test -f /app/data/config.json
