@@ -49,6 +49,12 @@ func setDefaults(conf *viper.Viper) {
 	conf.SetDefault("transport.max_idle_conns", 100)
 	conf.SetDefault("transport.max_idle_conns_per_host", 20)
 
+	// Browser-backed writes let the official ChatGPT SPA own browser-only
+	// Sentinel/PoW/Turnstile behavior. Disabled by default for standalone binary
+	// deployments; the canonical Docker Compose stack enables the sidecar.
+	conf.SetDefault("chatgpt.browser.enabled", false)
+	conf.SetDefault("chatgpt.browser.socket_path", "/run/gpt-mirror/browser.sock")
+
 	// Automatic account/share maintenance is disabled until the provider layer
 	// owns credential refresh and remote share/session behavior.
 	conf.SetDefault("account.refresh.enabled", false)
