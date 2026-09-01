@@ -1,6 +1,5 @@
 import accountService, {AccountAddReq} from "@/api/services/accountService.ts";
 import {
-  Button,
   Form,
   Input,
   Modal,
@@ -37,7 +36,6 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
     enabled: show,
   });
 
-
   useEffect(() => {
     if (show) {
       form1.setFieldsValue(formValue)
@@ -50,18 +48,6 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
       onOk(values, setLoading);
     });
   };
-
-  const onClickSessionKey = () => {
-    Modal.info({
-      title: 'Session Key 获取方法',
-      content: (
-        <ul>
-          <li>1. <Button type={'link'} href={'https://demo.fuclaude.com/'} target={'_blank'}>点击登录 Fuclaude </Button> </li>
-          <li>2. <Button type={'link'} href={'https://demo.fuclaude.com/api/auth/session'} target={'_blank'}>点击获取SessionKey</Button></li>
-        </ul>
-      ),
-    })
-  }
 
   return (
     <Modal
@@ -91,16 +77,16 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
           <Input />
         </Form.Item>
         <Form.Item<AccountAddReq> label="Email" name="email" required>
-          <Input placeholder={"仅作标记用, 没有实际用处"} />
+          <Input placeholder={"仅作账户标记"} />
         </Form.Item>
         <Form.Item<AccountAddReq> label={t('token.password')} name="password">
-          <Password placeholder={"仅作标记用, 没有实际用处"} />
+          <Password placeholder={"仅作本地备注/兼容字段"} />
         </Form.Item>
         <Form.Item<AccountAddReq>
           label={
             <Space>
               共享
-              <Tooltip title={"开启后，将分享在 /share 页面，任何人都可以使用它"} >
+              <Tooltip title={"共享记录会保留在本地；Provider 接入完成前无法生成远端登录会话"} >
                 <InfoCircleOutlined/>
               </Tooltip>
             </Space>
@@ -112,7 +98,6 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
             return v ? 1 : 0;
           }}
           required
-
         >
           <Switch />
         </Form.Item>
@@ -122,7 +107,7 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
             name={"oneApiChannelId"}
           >
             <Select
-              placeholder={"对接OneApi/NewApi的渠道, 非必填"}
+              placeholder={"对接 OneAPI/New API 的渠道，非必填"}
               allowClear={true}
               loading={isLoading}
               notFoundContent={isLoading ? <Spin size={"small"} /> : null}
@@ -134,11 +119,10 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
                     <div>
                       {
                         item.group.split(',').map((group) => {
-                            const colors = ["volcano", "orange", "gold", "lime", "green", "cyan", "blue", "geekblue", "purple", "magenta", "red"];
-                            // 根据group随机hash出不同颜色
-                            return <Tag color={colors[group.charCodeAt(0) % colors.length]}
+                          const colors = ["volcano", "orange", "gold", "lime", "green", "cyan", "blue", "geekblue", "purple", "magenta", "red"];
+                          return <Tag color={colors[group.charCodeAt(0) % colors.length]}
                             key={group}
-                            >{group}</Tag>
+                          >{group}</Tag>
                         })
                       }
                     </div>
@@ -151,39 +135,24 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
         {formValue.accountType === 'chatgpt' ? (
           <>
             <Form.Item
-              label={
-                <a href="https://token.oaifree.com/auth" target="_blank" rel="noopener noreferrer">
-                  Refresh Token (点击获取)
-                </a>
-              }
+              label="Refresh Token（本地保存，当前不会自动刷新）"
               name="refreshToken"
             >
-              <Input.TextArea />
+              <Input.TextArea placeholder="Provider 接入完成后由 Provider 负责刷新流程" />
             </Form.Item>
             <Form.Item
-              label={
-                <a href="https://token.oaifree.com/auth" target="_blank" rel="noopener noreferrer">
-                  Access Token (点击获取)
-                </a>
-              }
+              label="Access Token（手动填写）"
               name="accessToken"
             >
-              <Input.TextArea />
+              <Input.TextArea placeholder="当前仅本地保存；不会发送到旧第三方网关" />
             </Form.Item>
           </>
         ) : (
           <Form.Item
-            label={
-              <Space>
-                Session Key
-                <Button type={'link'} onClick={onClickSessionKey}>
-                  获取方法
-                </Button>
-              </Space>
-            }
+            label="Session Key（兼容字段）"
             name="sessionKey"
           >
-            <Input.TextArea />
+            <Input.TextArea placeholder="仅保留已有数据兼容，不再提供旧第三方获取入口" />
           </Form.Item>
         )}
       </Form>

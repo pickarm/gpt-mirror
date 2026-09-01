@@ -11,6 +11,21 @@ permissions:
   contents: read
 
 jobs:
+  legacy-boundary:
+    name: No legacy gateway references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject obsolete gateway references in active source
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='oaifree|fuclaude|pandora\.domain|proxy-pass\.(oaifree|fuclaude)'
+          if git grep -n -i -E "$pattern" -- cmd internal pkg frontend/src data; then
+            echo "Legacy gateway reference found in active source."
+            exit 1
+          fi
+
   backend:
     name: Go build and tests
     runs-on: ubuntu-latest
