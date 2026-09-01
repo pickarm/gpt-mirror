@@ -78,6 +78,13 @@ type Health struct {
 	CheckedAt time.Time `json:"checkedAt,omitempty"`
 }
 
+type Status struct {
+	HasCredential bool
+	State         State
+	Message       string
+	CheckedAt     *time.Time
+}
+
 type Record struct {
 	AccountID  uint
 	Kind       string
@@ -100,6 +107,7 @@ type Validator interface {
 
 type Provider interface {
 	Resolve(ctx context.Context, accountID uint) (Secret, error)
+	Status(ctx context.Context, accountID uint) (Status, error)
 	Put(ctx context.Context, accountID uint, secret Secret) error
 	Delete(ctx context.Context, accountID uint) error
 	Validate(ctx context.Context, accountID uint) (Health, error)
