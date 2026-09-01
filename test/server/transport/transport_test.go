@@ -22,8 +22,16 @@ func TestParseProxyRedactsCredentials(t *testing.T) {
 	if !spec.RemoteDNS() {
 		t.Fatal("socks5h must use remote DNS")
 	}
-	if strings.Contains(spec.Redacted(), "alice") || strings.Contains(spec.Redacted(), "super-secret") {
-		t.Fatalf("credentials leaked in redacted URL: %s", spec.Redacted())
+	if !spec.HasCredentials() {
+		t.Fatal("authenticated proxy must report credentials")
+	}
+	if spec.Endpoint() != "socks5h://proxy.example:1080" {
+		t.Fatalf("safe endpoint = %q", spec.Endpoint())
+	}
+	for _, output := range []string{spec.Redacted(), spec.Endpoint()} {
+		if strings.Contains(output, "alice") || strings.Contains(output, "super-secret") {
+			t.Fatalf("credentials leaked in proxy metadata: %s", output)
+		}
 	}
 	if !strings.Contains(spec.Redacted(), "proxy.example:1080") {
 		t.Fatalf("redacted route lost host: %s", spec.Redacted())
@@ -207,6 +215,9 @@ func TestDefaultPorts(t *testing.T) {
 		}
 		if spec.Scheme() != scheme {
 			t.Fatalf("ParseProxy(%q) scheme=%s", raw, spec.Scheme())
+		}
+		if spec.HasCredentials() {
+			t.Fatalf("ParseProxy(%q) unexpectedly reports credentials", raw)
 		}
 	}
 }
