@@ -74,6 +74,7 @@ export default function AccountPage() {
     accessToken: '',
     shared: 0,
     oneApiChannelId: undefined,
+    proxyUrl: '',
   }
 
   const [accountModalProps, setAccountModalProps] = useState<AccountModalProps>({
@@ -159,7 +160,6 @@ export default function AccountPage() {
       align: 'center',
       width: 150,
       render: (_, record) =>
-        // 当refreshToken存在时，显示refreshToken，并点击复制，否则显示Emtpy Tag
         record.refreshToken ? (
           <Input
             value={record.refreshToken}
@@ -176,7 +176,6 @@ export default function AccountPage() {
       align: 'center',
       width: 100,
       render: (_, record) =>
-        // 当accessToken存在时，显示accessToken，否则显示Error Tag
         record.accessToken ? (
           <Input
             value={record.accessToken}
@@ -193,7 +192,6 @@ export default function AccountPage() {
       align: 'center',
       width: 100,
       render: (_, record) =>
-        // 当accessToken存在时，显示accessToken，否则显示Error Tag
         record.shared == 1 ? (
           <CheckCircleTwoTone twoToneColor="#52c41a" />
         ) : (
@@ -339,6 +337,7 @@ export default function AccountPage() {
         refreshToken: record.refreshToken,
         accessToken: record.accessToken,
         oneApiChannelId: record.oneApiChannelId,
+        proxyUrl: record.proxyUrl,
       },
     }));
   };
@@ -394,5 +393,3 @@ export default function AccountPage() {
     </Space>
   );
 }
-
-
