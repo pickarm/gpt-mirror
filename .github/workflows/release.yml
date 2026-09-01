@@ -4,26 +4,77 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'release-trigger/v*'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
+  context:
+    name: Resolve release context
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      major_minor: ${{ steps.release.outputs.major_minor }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - name: Resolve and validate version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_REF" == refs/heads/release-trigger/v* ]]; then
+            tag="${GITHUB_REF#refs/heads/release-trigger/}"
+          else
+            echo "Unsupported release ref: $GITHUB_REF"
+            exit 1
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Invalid release tag: $tag"
+            exit 1
+          fi
+
+          version="${tag#v}"
+          core="${version%%-*}"
+          IFS='.' read -r major minor patch <<<"$core"
+          prerelease=false
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "major_minor=$major.$minor" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
   verify:
-    name: Verify tagged release commit
+    name: Verify release commit
+    needs: context
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Require release tag to point at main history
+      - name: Require release commit to be contained in main
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-            echo "Release tag must point to a commit contained in main."
+            echo "Release commit must already be contained in main."
+            exit 1
+          }
+          version="${{ needs.context.outputs.version }}"
+          grep -Fq "## [$version]" CHANGELOG.md || {
+            echo "CHANGELOG.md does not contain release $version."
             exit 1
           }
       - uses: actions/setup-go@v7
@@ -50,12 +101,12 @@ jobs:
       - name: Validate source and registry Compose entrypoints
         shell: bash
         run: |
-          cat >/tmp/gpt-mirror-release.env <<'EOF'
+          cat >/tmp/gpt-mirror-release.env <<EOF
           ADMIN_PASSWORD=release-validation-password
           SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           GPT_MIRROR_PORT=19001
           CHATGPT_BROWSER_ENABLED=true
-          GPT_MIRROR_VERSION=1.0.0-test
+          GPT_MIRROR_VERSION=${{ needs.context.outputs.version }}
           TRANSPORT_PROXY_URL=
           EOF
           docker compose --env-file /tmp/gpt-mirror-release.env -f compose.yaml config >/dev/null
@@ -63,7 +114,7 @@ jobs:
 
   publish-images:
     name: Publish GHCR images
-    needs: verify
+    needs: [context, verify]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -82,10 +133,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=${{ needs.context.outputs.version }}
+            type=raw,value=${{ needs.context.outputs.major_minor }},enable=${{ needs.context.outputs.prerelease == 'false' }}
+            type=raw,value=${{ needs.context.outputs.major }},enable=${{ needs.context.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.context.outputs.prerelease == 'false' }}
       - name: Build and push server image
         uses: docker/build-push-action@v6
         with:
@@ -104,10 +155,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}-browser
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=${{ needs.context.outputs.version }}
+            type=raw,value=${{ needs.context.outputs.major_minor }},enable=${{ needs.context.outputs.prerelease == 'false' }}
+            type=raw,value=${{ needs.context.outputs.major }},enable=${{ needs.context.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.context.outputs.prerelease == 'false' }}
       - name: Build and push browser worker image
         uses: docker/build-push-action@v6
         with:
@@ -122,7 +173,7 @@ jobs:
 
   published-stack-smoke:
     name: Smoke published GHCR stack
-    needs: publish-images
+    needs: [context, publish-images]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -136,13 +187,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
           cat >/tmp/gpt-mirror-published.env <<EOF
           ADMIN_PASSWORD=release-validation-password
           SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           GPT_MIRROR_PORT=19002
           CHATGPT_BROWSER_ENABLED=true
-          GPT_MIRROR_VERSION=$version
+          GPT_MIRROR_VERSION=${{ needs.context.outputs.version }}
           TRANSPORT_PROXY_URL=
           EOF
 
@@ -171,21 +221,32 @@ jobs:
 
   github-release:
     name: Publish GitHub Release
-    needs: published-stack-smoke
+    needs: [context, published-stack-smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Create release from tag
+      - name: Create release and clean trigger branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
+          tag="${{ needs.context.outputs.tag }}"
           prerelease=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+          target=()
+          if [[ "${{ needs.context.outputs.prerelease }}" == "true" ]]; then
             prerelease+=(--prerelease)
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            --title "GPT Mirror $GITHUB_REF_NAME" \
+          if [[ "$GITHUB_REF" == refs/heads/release-trigger/* ]]; then
+            target+=(--target "$GITHUB_SHA")
+          fi
+
+          gh release create "$tag" \
+            --title "GPT Mirror $tag" \
             --generate-notes \
-            "${prerelease[@]}"
+            "${prerelease[@]}" \
+            "${target[@]}"
+
+          if [[ "$GITHUB_REF" == refs/heads/release-trigger/* ]]; then
+            git push origin --delete "$GITHUB_REF_NAME" || true
+          fi
