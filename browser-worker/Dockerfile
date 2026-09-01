@@ -14,11 +14,15 @@ COPY browser-worker/entrypoint.sh ./entrypoint.sh
 
 RUN mkdir -p /run/gpt-mirror && \
     chown -R pwuser:pwuser /app /run/gpt-mirror && \
-    chmod 0755 /app/entrypoint.sh
+    chmod 0755 /app/entrypoint.sh && \
+    command -v node >/dev/null && \
+    command -v Xvfb >/dev/null && \
+    id pwuser >/dev/null
 
 ENV BROWSER_SOCKET_PATH=/run/gpt-mirror/browser.sock
 ENV BROWSER_NAVIGATION_TIMEOUT_MS=90000
 ENV BROWSER_SEND_TIMEOUT_MS=1200000
+ENV BROWSER_DISPLAY=99
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["xvfb-run", "-a", "node", "/app/server.mjs"]
+CMD ["node", "/app/server.mjs"]
