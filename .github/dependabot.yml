@@ -11,6 +11,17 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "github.com/gin-gonic/gin"
+          - "github.com/go-co-op/gocron"
+          - "github.com/go-resty/resty/v2"
+          - "github.com/golang-jwt/jwt/v5"
+          - "github.com/google/wire"
+          - "github.com/spf13/viper"
+          - "google.golang.org/grpc"
+          - "gorm.io/gorm"
+          - "gorm.io/driver/mysql"
+          - "gorm.io/driver/postgres"
         update-types:
           - "minor"
           - "patch"
