@@ -35,7 +35,8 @@
   },
   "security": {
     "2fa_secret": "",
-    "admin_password": ""
+    "admin_password": "",
+    "credential_key": ""
   },
   "share": {
     "custom": true,
