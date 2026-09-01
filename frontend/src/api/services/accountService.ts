@@ -44,6 +44,7 @@ export interface AccountAddReq {
   sessionKey?: string;
   refreshToken?: string;
   accessToken?: string;
+  cookie?: string;
   oneApiChannelId?: string | number;
   proxyUrl?: string;
   proxyDisplay?: string;
