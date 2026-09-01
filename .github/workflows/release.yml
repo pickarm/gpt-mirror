@@ -58,8 +58,8 @@ jobs:
           EOF
           docker compose --env-file /tmp/gpt-mirror-release.env -f compose.yaml config >/dev/null
 
-  publish-image:
-    name: Publish GHCR image
+  publish-images:
+    name: Publish GHCR images
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -72,8 +72,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Generate image metadata
-        id: meta
+
+      - name: Generate server image metadata
+        id: server-meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
@@ -82,21 +83,43 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
-      - name: Build and push multi-architecture image
+      - name: Build and push server image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.server-meta.outputs.tags }}
+          labels: ${{ steps.server-meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Generate browser worker image metadata
+        id: browser-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-browser
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      - name: Build and push browser worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./browser-worker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.browser-meta.outputs.tags }}
+          labels: ${{ steps.browser-meta.outputs.labels }}
           provenance: mode=max
           sbom: true
 
   github-release:
     name: Publish GitHub Release
-    needs: publish-image
+    needs: publish-images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
