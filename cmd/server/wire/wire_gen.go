@@ -8,17 +8,13 @@ package wire
 
 import (
 	"PandoraHelper/internal/handler"
-	"PandoraHelper/internal/middleware"
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
 	"PandoraHelper/pkg/app"
 	"PandoraHelper/pkg/jwt"
 	"PandoraHelper/pkg/log"
-	server2 "PandoraHelper/pkg/server"
 	"PandoraHelper/pkg/server/http"
-	"PandoraHelper/pkg/server/reverse/chatgpt"
-	"PandoraHelper/pkg/server/reverse/claude"
 	"PandoraHelper/pkg/sid"
 	"github.com/google/wire"
 	"github.com/spf13/viper"
@@ -48,18 +44,14 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	job := server.NewJob(logger)
 	task := server.NewTask(viperViper, logger, accountService, shareService)
 	migrate := server.NewMigrate(db, logger)
-	conversationRepository := repository.NewConversationRepository(repositoryRepository)
-	conversationLoggerMiddleware := middleware.NewConversationLoggerMiddleware(logger, conversationRepository)
-	chatgptServer := server.NewChatGPTReverseProxyServer(logger, viperViper, conversationLoggerMiddleware)
-	claudeServer := server.NewClaudeReverseProxyServer(logger, viperViper, conversationLoggerMiddleware)
-	appApp := newApp(viperViper, httpServer, job, task, migrate, chatgptServer, claudeServer)
+	appApp := newApp(httpServer, job, task, migrate)
 	return appApp, func() {
 	}, nil
 }
 
 // wire.go:
 
-var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewShareRepository, repository.NewConversationRepository)
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewShareRepository)
 
 var serviceCoordinatorSet = wire.NewSet(service.NewServiceCoordinator)
 
@@ -69,21 +61,8 @@ var migrateSet = wire.NewSet(server.NewMigrate)
 
 var handlerSet = wire.NewSet(handler.NewHandler, handler.NewUserHandler, handler.NewShareHandler, handler.NewAccountHandler, handler.NewHealthCheckHandler)
 
-var serverSet = wire.NewSet(server.NewHTTPServer, server.NewChatGPTReverseProxyServer, server.NewClaudeReverseProxyServer, server.NewJob)
+var serverSet = wire.NewSet(server.NewHTTPServer, server.NewJob)
 
-// build App
-func newApp(conf *viper.Viper, httpServer *http.Server, job *server.Job, task *server.Task, migrate *server.Migrate, gptServer *chatgpt.Server, claudeServer *claude.Server) *app.App {
-	servers := []server2.Server{
-		httpServer,
-		job,
-		task,
-		migrate,
-	}
-	if conf.GetBool("http.proxy-pass.oaifree.enable") {
-		servers = append(servers, gptServer)
-	}
-	if conf.GetBool("http.proxy-pass.fuclaude.enable") {
-		servers = append(servers, claudeServer)
-	}
-	return app.NewApp(app.WithServer(servers...), app.WithName("demo-server"))
+func newApp(httpServer *http.Server, job *server.Job, task *server.Task, migrate *server.Migrate) *app.App {
+	return app.NewApp(app.WithServer(httpServer, job, task, migrate), app.WithName("gpt-mirror"))
 }
