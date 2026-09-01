@@ -3,6 +3,7 @@ package service
 import (
 	v1 "PandoraHelper/api/v1"
 	"PandoraHelper/internal/model"
+	credentialprovider "PandoraHelper/internal/provider/credential"
 	"PandoraHelper/internal/repository"
 	apptransport "PandoraHelper/internal/transport"
 	"context"
@@ -19,7 +20,7 @@ type AccountService interface {
 	GetAccount(ctx context.Context, id int64) (*model.Account, error)
 	Update(ctx context.Context, account *model.Account) error
 	Create(ctx context.Context, account *model.Account) error
-	SearchAccount(ctx context.Context, accountType string, keyword string) ([]*model.Account, error)
+	SearchAccount(ctx context.Context, accountType string, keyword string) ([]*v1.AccountSummary, error)
 	DeleteAccount(ctx context.Context, id int64) error
 	GetShareAccountList(ctx *gin.Context) ([]*model.Account, bool, bool, error)
 	LoginShareAccount(ctx *gin.Context, req *v1.LoginShareAccountRequest) (string, error)
@@ -27,20 +28,28 @@ type AccountService interface {
 	UpdateOneApiChannelToken(ctx context.Context, id int64, token string) error
 }
 
-func NewAccountService(service *Service, accountRepository repository.AccountRepository, viper *viper.Viper, coordinator *Coordinator) AccountService {
+func NewAccountService(
+	service *Service,
+	accountRepository repository.AccountRepository,
+	credentialProvider credentialprovider.Provider,
+	viper *viper.Viper,
+	coordinator *Coordinator,
+) AccountService {
 	return &accountService{
-		Service:           service,
-		accountRepository: accountRepository,
-		viper:             viper,
-		coordinator:       coordinator,
+		Service:            service,
+		accountRepository:  accountRepository,
+		credentialProvider: credentialProvider,
+		viper:              viper,
+		coordinator:        coordinator,
 	}
 }
 
 type accountService struct {
 	*Service
-	accountRepository repository.AccountRepository
-	viper             *viper.Viper
-	coordinator       *Coordinator
+	accountRepository  repository.AccountRepository
+	credentialProvider credentialprovider.Provider
+	viper              *viper.Viper
+	coordinator        *Coordinator
 }
 
 func (s *accountService) UpdateOneApiChannelToken(ctx context.Context, id int64, token string) error {
@@ -121,24 +130,99 @@ func (s *accountService) GetShareAccountList(ctx *gin.Context) ([]*model.Account
 }
 
 func (s *accountService) RefreshAccount(ctx context.Context, id int64) error {
-	if _, err := s.accountRepository.GetAccount(ctx, id); err != nil {
+	account, err := s.accountRepository.GetAccount(ctx, id)
+	if err != nil {
 		return err
 	}
-	return ErrProviderNotConfigured
+	health, err := s.credentialProvider.Validate(ctx, account.ID)
+	if err != nil {
+		if health.Message != "" {
+			return fmt.Errorf("%s: %w", health.Message, err)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *accountService) Update(ctx context.Context, account *model.Account) error {
-	if err := validateAccountProxy(account.ProxyURL); err != nil {
+	if account.ID == 0 {
+		return errors.New("account id is required")
+	}
+
+	existing, err := s.accountRepository.GetAccount(ctx, int64(account.ID))
+	if err != nil {
 		return err
 	}
-	return s.accountRepository.Update(ctx, account)
+
+	incomingSecret := credentialFromAccount(account)
+	legacySecret := credentialFromAccount(existing)
+	if !incomingSecret.Empty() && !s.credentialProvider.CanPersist() {
+		return fmt.Errorf("cannot update account credentials: %w", credentialprovider.ErrEncryptionKeyMissing)
+	}
+
+	if account.ProxyURL != "" {
+		if err := validateAccountProxy(account.ProxyURL); err != nil {
+			return err
+		}
+		existing.ProxyURL = account.ProxyURL
+	}
+	existing.Email = account.Email
+	if account.AccountType != "" {
+		existing.AccountType = account.AccountType
+	}
+	existing.Shared = account.Shared
+	existing.OneApiChannelId = account.OneApiChannelId
+
+	secretToPersist := incomingSecret
+	if secretToPersist.Empty() && !legacySecret.Empty() && s.credentialProvider.CanPersist() {
+		secretToPersist = legacySecret
+	}
+
+	if s.credentialProvider.CanPersist() {
+		clearAccountCredentialFields(existing)
+	}
+
+	return s.tm.Transaction(ctx, func(txCtx context.Context) error {
+		if err := s.accountRepository.Update(txCtx, existing); err != nil {
+			return err
+		}
+		if !secretToPersist.Empty() {
+			if err := s.credentialProvider.Put(txCtx, existing.ID, secretToPersist); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *accountService) Create(ctx context.Context, account *model.Account) error {
 	if err := validateAccountProxy(account.ProxyURL); err != nil {
 		return err
 	}
-	return s.accountRepository.Create(ctx, account)
+
+	secret := credentialFromAccount(account)
+	if !secret.Empty() && !s.credentialProvider.CanPersist() {
+		return fmt.Errorf("cannot store account credentials: %w", credentialprovider.ErrEncryptionKeyMissing)
+	}
+
+	persisted := *account
+	clearAccountCredentialFields(&persisted)
+
+	if err := s.tm.Transaction(ctx, func(txCtx context.Context) error {
+		if err := s.accountRepository.Create(txCtx, &persisted); err != nil {
+			return err
+		}
+		if !secret.Empty() {
+			if err := s.credentialProvider.Put(txCtx, persisted.ID, secret); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	account.ID = persisted.ID
+	return nil
 }
 
 func validateAccountProxy(proxyURL string) error {
@@ -151,12 +235,75 @@ func validateAccountProxy(proxyURL string) error {
 	return nil
 }
 
-func (s *accountService) SearchAccount(ctx context.Context, accountType string, keyword string) ([]*model.Account, error) {
-	return s.accountRepository.SearchAccount(ctx, accountType, keyword)
+func credentialFromAccount(account *model.Account) credentialprovider.Secret {
+	if account == nil {
+		return credentialprovider.Secret{}
+	}
+	return credentialprovider.Secret{
+		Representation: credentialprovider.RepresentationLegacyFields,
+		Password:       account.Password,
+		SessionToken:   account.SessionToken,
+		AccessToken:    account.AccessToken,
+		RefreshToken:   account.RefreshToken,
+		SessionKey:     account.SessionKey,
+	}
+}
+
+func clearAccountCredentialFields(account *model.Account) {
+	account.Password = ""
+	account.SessionToken = ""
+	account.AccessToken = ""
+	account.RefreshToken = ""
+	account.SessionKey = ""
+}
+
+func (s *accountService) SearchAccount(ctx context.Context, accountType string, keyword string) ([]*v1.AccountSummary, error) {
+	accounts, err := s.accountRepository.SearchAccount(ctx, accountType, keyword)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]*v1.AccountSummary, 0, len(accounts))
+	for _, account := range accounts {
+		status, err := s.credentialProvider.Status(ctx, account.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !status.HasCredential && !credentialFromAccount(account).Empty() {
+			status.HasCredential = true
+			status.State = credentialprovider.StateUnknown
+			status.Message = "legacy credential is pending encrypted migration"
+		}
+
+		summary := &v1.AccountSummary{
+			ID:                account.ID,
+			Email:             account.Email,
+			AccountType:       account.AccountType,
+			CreateTime:        account.CreateTime,
+			UpdateTime:        account.UpdateTime,
+			Shared:            account.Shared,
+			OneApiChannelId:   account.OneApiChannelId,
+			HasCredential:     status.HasCredential,
+			CredentialState:   string(status.State),
+			CredentialMessage: status.Message,
+			CredentialChecked: status.CheckedAt,
+			ProxyConfigured:   account.ProxyURL != "",
+		}
+		if account.ProxyURL != "" {
+			summary.ProxyDisplay = apptransport.RedactProxyURL(account.ProxyURL)
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, nil
 }
 
 func (s *accountService) DeleteAccount(ctx context.Context, id int64) error {
-	return s.accountRepository.DeleteAccount(ctx, id)
+	return s.tm.Transaction(ctx, func(txCtx context.Context) error {
+		if err := s.credentialProvider.Delete(txCtx, uint(id)); err != nil {
+			return err
+		}
+		return s.accountRepository.DeleteAccount(txCtx, id)
+	})
 }
 
 func (s *accountService) GetAccount(ctx context.Context, id int64) (*model.Account, error) {
