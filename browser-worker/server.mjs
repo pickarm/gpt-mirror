@@ -288,6 +288,21 @@ const server = http.createServer(async (req, res) => {
   if (!res.writableEnded) res.end();
 });
 
+server.on('error', (error) => {
+  console.error(`browser-worker: server error: ${sanitizeError(error)}`);
+  process.exitCode = 1;
+});
+
+process.on('uncaughtException', (error) => {
+  console.error(`browser-worker: uncaught exception: ${sanitizeError(error)}`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error(`browser-worker: unhandled rejection: ${sanitizeError(reason)}`);
+  process.exit(1);
+});
+
 fs.mkdirSync(path.dirname(SOCKET_PATH), { recursive: true });
 try {
   fs.unlinkSync(SOCKET_PATH);
@@ -295,9 +310,15 @@ try {
   if (error?.code !== 'ENOENT') throw error;
 }
 
+console.error(`browser-worker: binding unix://${SOCKET_PATH} display=${process.env.DISPLAY || 'unset'}`);
 server.listen(SOCKET_PATH, () => {
-  fs.chmodSync(SOCKET_PATH, 0o666);
-  console.log(`browser worker listening on unix://${SOCKET_PATH}`);
+  try {
+    fs.chmodSync(SOCKET_PATH, 0o660);
+    console.error(`browser-worker: listening unix://${SOCKET_PATH}`);
+  } catch (error) {
+    console.error(`browser-worker: socket permission setup failed: ${sanitizeError(error)}`);
+    server.close(() => process.exit(1));
+  }
 });
 
 function shutdown() {
