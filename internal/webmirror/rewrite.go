@@ -34,7 +34,7 @@ func RewriteLocation(location string, upstream, mirror *url.URL) string {
 		return location
 	}
 	parsed, err := url.Parse(location)
-	if err != nil || !parsed.IsAbs() || !strings.EqualFold(parsed.Hostname(), upstream.Hostname()) {
+	if err != nil || !parsed.IsAbs() || !sameOrigin(parsed, upstream) {
 		return location
 	}
 	parsed.Scheme = mirror.Scheme
