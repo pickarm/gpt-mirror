@@ -186,8 +186,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cleanup() {
+            docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml ps -a || true
+            docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml logs --no-color || true
+            docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml down -v >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml up -d --build
-          trap 'docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml logs || true; docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml down -v >/dev/null 2>&1 || true' EXIT
 
           for _ in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
@@ -198,5 +204,6 @@ jobs:
 
           curl --fail --silent http://127.0.0.1:19001/health | grep -q 'healthy'
           curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T browser-worker node -e "const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>process.exit(x.statusCode===200?0:1));r.on('error',()=>process.exit(1));"
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/config.json
           docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/data.db
