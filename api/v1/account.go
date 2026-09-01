@@ -18,6 +18,7 @@ type AccountWriteRequest struct {
 	Password        string `json:"password"`
 	SessionToken    string `json:"sessionToken"`
 	AccessToken     string `json:"accessToken"`
+	Cookie          string `json:"cookie"`
 	Shared          int    `json:"shared"`
 	RefreshToken    string `json:"refreshToken"`
 	AccountType     string `json:"accountType"`
@@ -33,6 +34,7 @@ func (r *AccountWriteRequest) ToModel() *model.Account {
 		Password:        r.Password,
 		SessionToken:    r.SessionToken,
 		AccessToken:     r.AccessToken,
+		Cookie:          r.Cookie,
 		Shared:          r.Shared,
 		RefreshToken:    r.RefreshToken,
 		AccountType:     r.AccountType,
