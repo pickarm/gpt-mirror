@@ -111,17 +111,18 @@ func (e *browserWorkerExecutor) Send(ctx context.Context, input BrowserSendReque
 }
 
 type browserWorkerEvent struct {
-	Type           string `json:"type"`
-	Kind           string `json:"kind,omitempty"`
-	MessageText    string `json:"message,omitempty"`
-	ConversationID string `json:"conversationId,omitempty"`
-	MessageID      string `json:"messageId,omitempty"`
-	Delta          string `json:"delta,omitempty"`
-	Message        *struct {
-		ID      string `json:"id,omitempty"`
-		Role    string `json:"role,omitempty"`
-		Content string `json:"content,omitempty"`
-	} `json:"message,omitempty"`
+	Type           string          `json:"type"`
+	Kind           string          `json:"kind,omitempty"`
+	ConversationID string          `json:"conversationId,omitempty"`
+	MessageID      string          `json:"messageId,omitempty"`
+	Delta          string          `json:"delta,omitempty"`
+	MessageRaw     json.RawMessage `json:"message,omitempty"`
+}
+
+type browserWorkerMessage struct {
+	ID      string `json:"id,omitempty"`
+	Role    string `json:"role,omitempty"`
+	Content string `json:"content,omitempty"`
 }
 
 type browserWorkerStream struct {
@@ -157,7 +158,7 @@ func (s *browserWorkerStream) Recv(ctx context.Context) (StreamEvent, error) {
 			return StreamEvent{}, &Error{Kind: ErrorKindProtocol, Operation: "browser_stream", Err: fmt.Errorf("decode browser worker event: %w", err)}
 		}
 		if event.Type == "error" {
-			return StreamEvent{}, browserWorkerError(event.Kind, event.MessageText)
+			return StreamEvent{}, browserWorkerError(event.Kind, browserWorkerErrorMessage(event.MessageRaw))
 		}
 
 		out := StreamEvent{
@@ -166,15 +167,19 @@ func (s *browserWorkerStream) Recv(ctx context.Context) (StreamEvent, error) {
 			MessageID:      event.MessageID,
 			Delta:          event.Delta,
 		}
-		if event.Message != nil {
-			role := Role(event.Message.Role)
+		if len(event.MessageRaw) > 0 && !bytes.Equal(bytes.TrimSpace(event.MessageRaw), []byte("null")) {
+			var message browserWorkerMessage
+			if err := json.Unmarshal(event.MessageRaw, &message); err != nil {
+				return StreamEvent{}, &Error{Kind: ErrorKindProtocol, Operation: "browser_stream", Err: fmt.Errorf("decode browser worker message: %w", err)}
+			}
+			role := Role(message.Role)
 			if role == "" {
 				role = RoleAssistant
 			}
 			out.Message = &Message{
-				ID:      event.Message.ID,
+				ID:      message.ID,
 				Role:    role,
-				Content: event.Message.Content,
+				Content: message.Content,
 			}
 		}
 		return out, nil
@@ -184,6 +189,17 @@ func (s *browserWorkerStream) Recv(ctx context.Context) (StreamEvent, error) {
 		return StreamEvent{}, &Error{Kind: ErrorKindTransport, Operation: "browser_stream", Err: err}
 	}
 	return StreamEvent{}, io.EOF
+}
+
+func browserWorkerErrorMessage(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var message string
+	if err := json.Unmarshal(raw, &message); err == nil {
+		return message
+	}
+	return "browser worker failed"
 }
 
 func (s *browserWorkerStream) Close() error {
