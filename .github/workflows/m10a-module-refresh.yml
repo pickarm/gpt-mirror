@@ -1,0 +1,41 @@
+name: M10A module refresh
+
+on:
+  push:
+    branches:
+      - m10a/go-security-transport
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: m10a/go-security-transport
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Refresh selected dependencies
+        run: |
+          go get github.com/go-resty/resty/v2@v2.17.2
+          go get github.com/golang-jwt/jwt/v5@v5.3.1
+          go mod verify
+          go test ./...
+      - name: Commit module metadata when changed
+        run: |
+          if git diff --quiet -- go.mod go.sum; then
+            echo "Module metadata already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go.mod go.sum
+          git commit -m "deps: refresh Go transport and auth dependencies"
+          git push origin HEAD:m10a/go-security-transport
