@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  legacy-boundary:
-    name: No legacy gateway references
+  architecture-boundary:
+    name: Architecture boundaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,14 @@ jobs:
           pattern='oaifree|fuclaude|pandora\.domain|proxy-pass\.(oaifree|fuclaude)'
           if git grep -n -i -E "$pattern" -- cmd internal pkg frontend/src data; then
             echo "Legacy gateway reference found in active source."
+            exit 1
+          fi
+      - name: Keep ChatGPT Web endpoints inside provider implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -E '/backend-api/' -- cmd internal/handler internal/service internal/repository pkg frontend/src data; then
+            echo "ChatGPT Web endpoint leaked outside internal/provider/chatgpt."
             exit 1
           fi
 
