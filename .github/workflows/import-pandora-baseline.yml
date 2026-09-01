@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - baseline/pandorahelper-f6275d3
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout GPT Mirror
+      - name: Checkout GPT Mirror baseline branch
         uses: actions/checkout@v4
         with:
           ref: baseline/pandorahelper-f6275d3
