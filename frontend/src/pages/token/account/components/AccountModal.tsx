@@ -158,6 +158,24 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
         {formValue.accountType === 'chatgpt' ? (
           <>
             <Form.Item
+              label="Session Token"
+              name="sessionToken"
+              tooltip="可填 __Secure-next-auth.session-token 的值。完整浏览器 Cookie 更适合分片 session cookie。"
+            >
+              <Input.Password placeholder={credentialPlaceholder} autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item
+              label="Browser Cookie"
+              name="cookie"
+              tooltip="可粘贴 chatgpt.com 请求的完整 Cookie header。只会加密保存，不会在账号列表接口中回显。"
+            >
+              <Input.TextArea
+                placeholder={credentialPlaceholder}
+                autoComplete="off"
+                autoSize={{ minRows: 2, maxRows: 5 }}
+              />
+            </Form.Item>
+            <Form.Item
               label="Refresh Token"
               name="refreshToken"
             >

@@ -114,6 +114,7 @@ type Provider interface {
 	Put(ctx context.Context, accountID uint, secret Secret) error
 	Delete(ctx context.Context, accountID uint) error
 	Validate(ctx context.Context, accountID uint) (Health, error)
+	RecordHealth(ctx context.Context, accountID uint, health Health) error
 	CanPersist() bool
 }
 

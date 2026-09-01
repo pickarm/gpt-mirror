@@ -1,7 +1,7 @@
 services:
   gpt-mirror:
     build:
-      context: ../..
+      context: .
       dockerfile: Dockerfile
     image: gpt-mirror:local
     container_name: gpt-mirror
@@ -13,10 +13,13 @@ services:
       SECURITY_CREDENTIAL_KEY: "${SECURITY_CREDENTIAL_KEY:?set SECURITY_CREDENTIAL_KEY in .env}"
       TRANSPORT_PROXY_URL: "${TRANSPORT_PROXY_URL:-}"
     volumes:
-      - ./data:/app/data
+      - gpt-mirror-data:/app/data
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9000/readiness"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  gpt-mirror-data:

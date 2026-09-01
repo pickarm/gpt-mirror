@@ -3,6 +3,7 @@ package service
 import (
 	v1 "PandoraHelper/api/v1"
 	"PandoraHelper/internal/model"
+	chatgptprovider "PandoraHelper/internal/provider/chatgpt"
 	credentialprovider "PandoraHelper/internal/provider/credential"
 	"PandoraHelper/internal/repository"
 	apptransport "PandoraHelper/internal/transport"
@@ -136,6 +137,16 @@ func (s *accountService) RefreshAccount(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
+
+	if account.AccountType == "" || account.AccountType == "chatgpt" {
+		status, providerErr := s.chatgptProvider.Health(ctx, chatgptprovider.AccountRef{ID: account.ID})
+		health := credentialHealthFromChatGPT(status)
+		if recordErr := s.credentialProvider.RecordHealth(ctx, account.ID, health); recordErr != nil && providerErr == nil {
+			return recordErr
+		}
+		return providerErr
+	}
+
 	health, err := s.credentialProvider.Validate(ctx, account.ID)
 	if err != nil {
 		if health.Message != "" {
@@ -144,6 +155,23 @@ func (s *accountService) RefreshAccount(ctx context.Context, id int64) error {
 		return err
 	}
 	return nil
+}
+
+func credentialHealthFromChatGPT(status chatgptprovider.AccountStatus) credentialprovider.Health {
+	state := credentialprovider.StateUnknown
+	switch status.State {
+	case chatgptprovider.AccountStateHealthy:
+		state = credentialprovider.StateHealthy
+	case chatgptprovider.AccountStateExpired:
+		state = credentialprovider.StateExpired
+	case chatgptprovider.AccountStateBlocked:
+		state = credentialprovider.StateBlocked
+	}
+	message := status.Label
+	if message == "" {
+		message = "ChatGPT provider health check completed"
+	}
+	return credentialprovider.Health{State: state, Message: message, CheckedAt: status.CheckedAt}
 }
 
 func (s *accountService) Update(ctx context.Context, account *model.Account) error {
@@ -276,6 +304,7 @@ func credentialFromAccount(account *model.Account) credentialprovider.Secret {
 		AccessToken:    account.AccessToken,
 		RefreshToken:   account.RefreshToken,
 		SessionKey:     account.SessionKey,
+		Cookie:         account.Cookie,
 	}
 	if account.ProxyURL != "" {
 		if spec, err := apptransport.ParseProxy(account.ProxyURL); err == nil && spec.HasCredentials() {
@@ -323,6 +352,7 @@ func clearAccountCredentialFields(account *model.Account) {
 	account.AccessToken = ""
 	account.RefreshToken = ""
 	account.SessionKey = ""
+	account.Cookie = ""
 }
 
 func (s *accountService) SearchAccount(ctx context.Context, accountType string, keyword string) ([]*v1.AccountSummary, error) {

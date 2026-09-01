@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pattern='json:"(password|sessionToken|accessToken|refreshToken|sessionKey|proxyUrl)"'
+          pattern='json:"(password|sessionToken|accessToken|refreshToken|sessionKey|proxyUrl|cookie)"'
           if git grep -n -E "$pattern" -- internal/model/account.go; then
             echo "Sensitive Account field became JSON-serializable. Use an explicit write DTO and redacted read model."
             exit 1
@@ -75,18 +75,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.7'
           cache: true
       - name: Download dependencies
         run: go mod download
-      - name: Run tests
-        run: go test ./test/server/...
+      - name: Run full Go test suite
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee /tmp/go-test.log
+      - name: Upload Go test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-log-${{ github.run_id }}
+          path: /tmp/go-test.log
+          retention-days: 1
       - name: Build server
-        run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/gpt-mirror ./cmd/server
       - name: Build web mirror probe
-        run: go build -ldflags='-s -w' -o /tmp/webmirror-probe ./cmd/webmirror-probe
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/webmirror-probe ./cmd/webmirror-probe
 
   frontend:
     name: Frontend build
@@ -114,12 +124,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.7'
           cache: true
       - name: Build server
-        run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/gpt-mirror ./cmd/server
       - name: Start from a fresh data directory without legacy upstreams
         shell: bash
         run: |
@@ -137,7 +147,7 @@ jobs:
 
           (
             cd "$workdir"
-            /tmp/PandoraHelper -conf "$workdir/data/" >server.log 2>&1 &
+            /tmp/gpt-mirror -conf "$workdir/data/" >server.log 2>&1 &
             echo $! >server.pid
           )
 
@@ -157,21 +167,36 @@ jobs:
           ! grep -Eqi 'oaifree|fuclaude' "$workdir/server.log"
 
   docker:
-    name: Docker image build
+    name: Release Docker Compose smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.7'
-          cache: true
-      - name: Build Linux binaries expected by upstream Dockerfile
+      - name: Prepare release Compose environment
+        shell: bash
+        run: |
+          cat >/tmp/gpt-mirror-ci.env <<'EOF'
+          ADMIN_PASSWORD=ci-release-password
+          SECURITY_CREDENTIAL_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          GPT_MIRROR_PORT=19001
+          TRANSPORT_PROXY_URL=
+          EOF
+      - name: Validate canonical root Compose configuration
+        run: docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml config >/tmp/compose.yml
+      - name: Start canonical release deployment
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p builds/PandoraHelper-ci-linux-amd64
-          mkdir -p builds/PandoraHelper-ci-linux-arm64
-          GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o builds/PandoraHelper-ci-linux-amd64/PandoraHelper ./cmd/server
-          GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -o builds/PandoraHelper-ci-linux-arm64/PandoraHelper ./cmd/server
-      - name: Build Docker image
-        run: docker build -f deploy/build/Dockerfile --build-arg VERSION=ci --build-arg TARGETPLATFORM=linux/amd64 -t gpt-mirror:ci .
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml up -d --build
+          trap 'docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml logs || true; docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml down -v >/dev/null 2>&1 || true' EXIT
+
+          for _ in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          curl --fail --silent http://127.0.0.1:19001/health | grep -q 'healthy'
+          curl --fail --silent http://127.0.0.1:19001/readiness | grep -q 'ready'
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/config.json
+          docker compose --env-file /tmp/gpt-mirror-ci.env -f compose.yaml exec -T gpt-mirror test -f /app/data/data.db

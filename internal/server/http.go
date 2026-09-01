@@ -26,6 +26,7 @@ func NewHTTPServer(
 	userHandler *handler.UserHandler,
 	shareHandler *handler.ShareHandler,
 	accountHandler *handler.AccountHandler,
+	conversationHandler *handler.ConversationHandler,
 	hearthCheckHandler *handler.HealthCheckHandler,
 ) *http.Server {
 	gin.SetMode(gin.ReleaseMode)
@@ -113,6 +114,19 @@ func NewHTTPServer(
 			accountAuthRouter.POST("/delete", accountHandler.DeleteAccount)
 			accountAuthRouter.POST("/update", accountHandler.UpdateAccount)
 			accountAuthRouter.POST("/oneapi/channels", accountHandler.GetOneApiChannelList)
+		}
+
+		chatgptRouter := v1.Group("/chatgpt").Use(middleware.StrictAuth(jwt, logger))
+		{
+			chatgptRouter.POST("/health", conversationHandler.Health)
+			chatgptRouter.POST("/models", conversationHandler.Models)
+			chatgptRouter.POST("/conversations/list", conversationHandler.List)
+			chatgptRouter.POST("/conversations/get", conversationHandler.Get)
+			chatgptRouter.POST("/conversations/create", conversationHandler.Create)
+			chatgptRouter.POST("/conversations/continue", conversationHandler.Continue)
+			chatgptRouter.POST("/conversations/rename", conversationHandler.Rename)
+			chatgptRouter.POST("/conversations/archive", conversationHandler.Archive)
+			chatgptRouter.POST("/conversations/delete", conversationHandler.Delete)
 		}
 
 		userAuthRouter := v1.Group("/user").Use(middleware.StrictAuth(jwt, logger))

@@ -57,8 +57,10 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	shareHandler := handler.NewShareHandler(handlerHandler, shareService)
 	accountService := service.NewAccountService(serviceService, accountRepository, credentialProvider, viperViper, coordinator)
 	accountHandler := handler.NewAccountHandler(handlerHandler, accountService)
+	conversationService := service.NewConversationService(serviceService)
+	conversationHandler := handler.NewConversationHandler(handlerHandler, conversationService)
 	healthCheckHandler := handler.NewHealthCheckHandler()
-	httpServer := server.NewHTTPServer(logger, viperViper, jwtJWT, userHandler, shareHandler, accountHandler, healthCheckHandler)
+	httpServer := server.NewHTTPServer(logger, viperViper, jwtJWT, userHandler, shareHandler, accountHandler, conversationHandler, healthCheckHandler)
 	job := server.NewJob(logger)
 	task := server.NewTask(viperViper, logger, accountService, shareService)
 	migrate := server.NewMigrate(db, logger, transaction, accountRepository, credentialProvider)
@@ -75,11 +77,11 @@ var providerSet = wire.NewSet(apptransport.NewFactoryFromViper, credentialprovid
 
 var serviceCoordinatorSet = wire.NewSet(service.NewServiceCoordinator)
 
-var serviceSet = wire.NewSet(providerSet, service.NewService, service.NewUserService, serviceCoordinatorSet, service.NewAccountService, service.NewShareService, server.NewTask)
+var serviceSet = wire.NewSet(providerSet, service.NewService, service.NewUserService, service.NewConversationService, serviceCoordinatorSet, service.NewAccountService, service.NewShareService, server.NewTask)
 
 var migrateSet = wire.NewSet(server.NewMigrate)
 
-var handlerSet = wire.NewSet(handler.NewHandler, handler.NewUserHandler, handler.NewShareHandler, handler.NewAccountHandler, handler.NewHealthCheckHandler)
+var handlerSet = wire.NewSet(handler.NewHandler, handler.NewUserHandler, handler.NewShareHandler, handler.NewAccountHandler, handler.NewConversationHandler, handler.NewHealthCheckHandler)
 
 var serverSet = wire.NewSet(server.NewHTTPServer, server.NewJob)
 
