@@ -1,0 +1,67 @@
+name: Baseline verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Go build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache: true
+      - name: Download dependencies
+        run: go mod download
+      - name: Build server
+        run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+      - name: Run upstream tests
+        run: go test ./test/server/...
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm build
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache: true
+      - name: Build Linux binaries expected by upstream Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds/PandoraHelper-baseline-linux-amd64
+          mkdir -p builds/PandoraHelper-baseline-linux-arm64
+          GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o builds/PandoraHelper-baseline-linux-amd64/PandoraHelper ./cmd/server
+          GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -o builds/PandoraHelper-baseline-linux-arm64/PandoraHelper ./cmd/server
+      - name: Build upstream Docker image
+        run: docker build -f deploy/build/Dockerfile --build-arg VERSION=baseline --build-arg TARGETPLATFORM=linux/amd64 -t gpt-mirror:baseline .
