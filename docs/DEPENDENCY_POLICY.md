@@ -16,6 +16,8 @@ The Docker base image is intentionally not listed in `dependabot.yml`. The proje
 
 Routine minor and patch version updates are grouped per ecosystem to reduce review noise. Major version updates do not match those groups and therefore remain separate pull requests for explicit compatibility review.
 
+The Go routine group deliberately excludes high-impact framework/runtime dependencies so even SemVer-minor updates remain individually reviewable. Current exclusions cover Gin, Viper, GORM and its SQL drivers, gRPC, Resty, gocron, Wire, and JWT. These packages affect HTTP binding/routing, configuration decoding, persistence/migrations, RPC/network behavior, scheduling, generated dependency injection, or authentication semantics and therefore require attributable CI and release-note review.
+
 Security updates are surfaced in dedicated security groups so they can be prioritized independently of routine maintenance.
 
 ## Merge rules
@@ -35,6 +37,8 @@ No automatic merge policy is enabled by this configuration.
 ### Go
 
 Security and foundational modules are prioritized. Large module-graph changes should be split into attributable batches. Avoid broad `go mod tidy` cleanup in a security-only PR when it would remove or reclassify unrelated historical dependencies.
+
+Dependabot's routine Go group is only for dependencies whose updates can reasonably be reviewed together. High-impact runtime/framework packages are excluded with `exclude-patterns`, which causes Dependabot to continue raising individual pull requests for them rather than suppressing their updates.
 
 ### Frontend
 
