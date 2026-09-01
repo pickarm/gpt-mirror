@@ -33,6 +33,15 @@ jobs:
             echo "ChatGPT Web endpoint leaked outside internal/provider/chatgpt."
             exit 1
           fi
+      - name: Keep account model secret-free on JSON output
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='json:"(password|sessionToken|accessToken|refreshToken|sessionKey|proxyUrl)"'
+          if git grep -n -E "$pattern" -- internal/model/account.go; then
+            echo "Sensitive Account field became JSON-serializable. Use an explicit write DTO and redacted read model."
+            exit 1
+          fi
 
   backend:
     name: Go build and tests
