@@ -64,20 +64,26 @@ cd gpt-mirror
 cp .env.example .env
 ```
 
-Edit `.env` and set at least:
-
-```dotenv
-ADMIN_PASSWORD=replace-with-a-strong-admin-password
-CREDENTIAL_KEY=replace-with-a-base64-or-hex-32-byte-key
-```
-
-Generate a credential encryption key with:
+Generate a credential encryption key:
 
 ```bash
 openssl rand -base64 32
 ```
 
-Then start the release image from source:
+Edit `.env` and set at least:
+
+```dotenv
+ADMIN_PASSWORD=replace-with-a-strong-admin-password
+SECURITY_CREDENTIAL_KEY=replace-with-the-generated-32-byte-base64-or-hex-key
+```
+
+Optional global proxy:
+
+```dotenv
+TRANSPORT_PROXY_URL=socks5h://127.0.0.1:1080
+```
+
+Then start the release image from the repository root:
 
 ```bash
 docker compose up -d --build
@@ -96,7 +102,7 @@ curl http://localhost:9000/health
 curl http://localhost:9000/readiness
 ```
 
-The container initializes `/app/data/config.json` on first start and stores SQLite state under the persistent data volume.
+The root `compose.yaml` uses a named volume for `/app/data`. The container initializes `/app/data/config.json` on first start and keeps the SQLite database in that persistent volume.
 
 ## ChatGPT credentials
 
@@ -106,11 +112,11 @@ Add a ChatGPT account from the admin console. Supported inputs include:
 - Session Token
 - Full browser Cookie header
 
-Secrets are written to the encrypted credential store when `security.credential_key` / `CREDENTIAL_KEY` is configured. Normal account search/list responses expose only metadata such as credential state and redacted proxy information.
+Secrets are written to the encrypted credential store when `security.credential_key` / `SECURITY_CREDENTIAL_KEY` is configured. Normal account search/list responses expose only metadata such as credential state and redacted proxy information.
 
 A full browser cookie is useful when the session depends on multiple cookie values such as split session cookies or `oai-did`. GPT Mirror can exchange an accepted ChatGPT browser session for an access token through the upstream session endpoint.
 
-Do not commit real tokens, cookies, passwords, or encryption keys to this repository.
+Do not commit real tokens, cookies, passwords, or encryption keys to this repository. `.env` is ignored; `.env.example` contains placeholders only.
 
 ## Outbound proxy
 
@@ -129,7 +135,7 @@ Authenticated forms are supported as well:
 socks5h://username:password@host:port
 ```
 
-Set a global route with `transport.proxy_url` / the corresponding environment override, or configure a proxy on an individual account. Per-account routing takes precedence over the global proxy.
+Set a global route with `transport.proxy_url` / `TRANSPORT_PROXY_URL`, or configure a proxy on an individual account. Per-account routing takes precedence over the global proxy.
 
 Proxy credentials are redacted from normal API/UI output.
 
@@ -191,6 +197,7 @@ A v1.0 release must pass all of the following:
 - `go test ./...`
 - frontend locked-dependency build
 - fresh SQLite startup smoke test
+- root Docker Compose configuration validation
 - source-first Docker image build
 - release-container `/health` and `/readiness` smoke test
 - no legacy `oaifree`/`fuclaude` references in active source
