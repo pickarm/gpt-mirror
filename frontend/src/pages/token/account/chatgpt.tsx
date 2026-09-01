@@ -19,6 +19,8 @@ import {
   Popconfirm,
   Row,
   Space,
+  Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import Table, { ColumnsType } from 'antd/es/table';
@@ -33,9 +35,6 @@ import {
   useRefreshAccountMutation,
   useUpdateAccountMutation,
 } from '@/store/accountStore.ts';
-import ProTag from '@/theme/antd/components/tag';
-import { onCopy } from '@/utils/copy.ts';
-
 import { useAddShareMutation } from '@/store/shareStore.ts';
 
 import {ChatGPTAccount, defaultShare, ProductType, Share} from '#/entity';
@@ -65,7 +64,7 @@ export default function AccountPage() {
 
   const searchEmail = Form.useWatch('email', searchForm);
 
-  const defaultAccountFormProps = {
+  const defaultAccountFormProps: AccountAddReq = {
     id: undefined,
     email: '',
     accountType: 'chatgpt' as ProductType,
@@ -75,7 +74,9 @@ export default function AccountPage() {
     shared: 0,
     oneApiChannelId: undefined,
     proxyUrl: '',
-  }
+    proxyDisplay: '',
+    hasCredential: false,
+  };
 
   const [accountModalProps, setAccountModalProps] = useState<AccountModalProps>({
     formValue: { ...defaultAccountFormProps },
@@ -99,7 +100,7 @@ export default function AccountPage() {
       }
     },
     onCancel: () => {
-      setAccountModalProps((prev) => ({...prev, show: false, formValue: {...defaultAccountFormProps}}))
+      setAccountModalProps((prev) => ({...prev, show: false, formValue: {...defaultAccountFormProps}}));
     },
   });
 
@@ -144,47 +145,30 @@ export default function AccountPage() {
       ),
     },
     {
-      title: t('token.password'),
-      dataIndex: 'password',
-      align: 'center',
-      ellipsis: true,
-      render: (text) => (
-        <Typography.Text style={{ maxWidth: 200 }} ellipsis>
-          {text}
-        </Typography.Text>
-      ),
-    },
-    {
-      title: 'Refresh Token',
-      dataIndex: 'refreshToken',
+      title: 'Credential',
+      key: 'credential',
       align: 'center',
       width: 150,
-      render: (_, record) =>
-        record.refreshToken ? (
-          <Input
-            value={record.refreshToken}
-            onClick={(e) => onCopy(record.refreshToken!, t, e)}
-            readOnly
-          />
-        ) : (
-          <ProTag color="error">Empty</ProTag>
-        ),
+      render: (_, record) => {
+        const state = record.credentialState ?? 'unknown';
+        const color = state === 'healthy' ? 'success' : state === 'expired' || state === 'blocked' ? 'error' : 'default';
+        return (
+          <Tooltip title={record.credentialMessage}>
+            <Tag color={color}>{record.hasCredential ? state : 'not configured'}</Tag>
+          </Tooltip>
+        );
+      },
     },
     {
-      title: 'Access Token',
-      dataIndex: 'accessToken',
+      title: 'Proxy',
+      key: 'proxy',
       align: 'center',
-      width: 100,
-      render: (_, record) =>
-        record.accessToken ? (
-          <Input
-            value={record.accessToken}
-            onClick={(e) => onCopy(record.accessToken!, t, e)}
-            readOnly
-          />
-        ) : (
-          <ProTag color="error">Empty</ProTag>
-        ),
+      width: 220,
+      render: (_, record) => (
+        <Typography.Text style={{ maxWidth: 210 }} ellipsis>
+          {record.proxyConfigured ? record.proxyDisplay : 'global / direct'}
+        </Typography.Text>
+      ),
     },
     {
       title: t('token.shareStatus'),
@@ -323,21 +307,22 @@ export default function AccountPage() {
   };
 
   const onEdit = (record: ChatGPTAccount) => {
-    console.log(record)
     setAccountModalProps((prev) => ({
       ...prev,
       show: true,
       title: t('token.edit'),
       formValue: {
-        ...prev.formValue,
         id: record.id,
         email: record.email,
-        password: record.password,
+        accountType: 'chatgpt',
+        password: '',
         shared: record.shared,
-        refreshToken: record.refreshToken,
-        accessToken: record.accessToken,
+        refreshToken: '',
+        accessToken: '',
         oneApiChannelId: record.oneApiChannelId,
-        proxyUrl: record.proxyUrl,
+        proxyUrl: '',
+        proxyDisplay: record.proxyDisplay,
+        hasCredential: record.hasCredential,
       },
     }));
   };
