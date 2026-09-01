@@ -12,7 +12,7 @@
     "prepare": "cd .. && husky install frontend/.husky"
   },
   "dependencies": {
-    "@ant-design/cssinjs": "^1.17.2",
+    "@ant-design/cssinjs": "^2.1.2",
     "@ant-design/icons": "^5.2.6",
     "@fullcalendar/common": "^5.11.5",
     "@fullcalendar/core": "^6.1.9",
