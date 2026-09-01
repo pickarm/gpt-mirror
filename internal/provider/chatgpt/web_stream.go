@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,17 +13,18 @@ import (
 const maxSSELineSize = 8 << 20
 
 type sseStream struct {
-	mu             sync.Mutex
-	body           io.ReadCloser
-	scanner        *bufio.Scanner
-	operation      string
-	pendingData    []string
-	queue          []StreamEvent
-	lastText       map[string]string
-	completed      map[string]bool
+	mu               sync.Mutex
+	body             io.ReadCloser
+	scanner          *bufio.Scanner
+	operation        string
+	pendingData      []string
+	queue            []StreamEvent
+	lastText         map[string]string
+	completed        map[string]bool
 	seenConversation map[string]bool
-	done           bool
-	closed         bool
+	terminalErr      error
+	done             bool
+	closed           bool
 }
 
 func newSSEStream(body io.ReadCloser, operation string) Stream {
@@ -50,6 +50,12 @@ func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
 	if len(s.queue) > 0 {
 		return s.pop(), nil
 	}
+	if s.terminalErr != nil {
+		err := s.terminalErr
+		s.terminalErr = nil
+		s.done = true
+		return StreamEvent{}, err
+	}
 	if s.done {
 		return StreamEvent{}, io.EOF
 	}
@@ -67,6 +73,12 @@ func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
 				if len(s.queue) > 0 {
 					return s.pop(), nil
 				}
+				if s.terminalErr != nil {
+					err := s.terminalErr
+					s.terminalErr = nil
+					s.done = true
+					return StreamEvent{}, err
+				}
 			}
 			if err := s.scanner.Err(); err != nil {
 				return StreamEvent{}, &Error{Kind: ErrorKindProtocol, Operation: s.operation, Err: fmt.Errorf("read SSE stream: %w", err)}
@@ -80,6 +92,12 @@ func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
 			s.flushEvent()
 			if len(s.queue) > 0 {
 				return s.pop(), nil
+			}
+			if s.terminalErr != nil {
+				err := s.terminalErr
+				s.terminalErr = nil
+				s.done = true
+				return StreamEvent{}, err
 			}
 			if s.done {
 				return StreamEvent{}, io.EOF
@@ -128,16 +146,11 @@ func (s *sseStream) flushEvent() {
 		Error          interface{} `json:"error"`
 	}
 	if err := json.Unmarshal([]byte(data), &payload); err != nil {
-		s.queue = append(s.queue, StreamEvent{
-			Type:  StreamEventDone,
-			Delta: "",
-			Message: nil,
-		})
-		s.done = true
+		s.terminalErr = &Error{Kind: ErrorKindProtocol, Operation: s.operation, Err: fmt.Errorf("decode SSE event: %w", err)}
 		return
 	}
 	if payload.Error != nil {
-		s.done = true
+		s.terminalErr = &Error{Kind: ErrorKindProtocol, Operation: s.operation, Err: fmt.Errorf("upstream stream reported an error")}
 		return
 	}
 
@@ -166,7 +179,7 @@ func (s *sseStream) flushEvent() {
 		} else if text != previous {
 			// Upstream occasionally rewrites an in-progress block. The stream
 			// abstraction cannot retract already-emitted text, so expose the new
-			// snapshot as a delta and rely on MessageCompleted as authoritative.
+			// snapshot and rely on MessageCompleted as authoritative.
 			delta = text
 		}
 		if delta != "" {
@@ -211,4 +224,3 @@ func (s *sseStream) pop() StreamEvent {
 }
 
 var _ Stream = (*sseStream)(nil)
-var _ = errors.Is
