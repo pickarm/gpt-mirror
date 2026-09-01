@@ -6,6 +6,7 @@ type Account struct {
 	Password        string     `json:"-" gorm:"column:password"`
 	SessionToken    string     `json:"-" gorm:"column:session_token"`
 	AccessToken     string     `json:"-" gorm:"column:access_token"`
+	Cookie          string     `json:"-" gorm:"-"`
 	CreateTime      *LocalTime `json:"createTime" gorm:"autoCreateTime" gorm:"column:create_time"`
 	UpdateTime      *LocalTime `json:"updateTime" gorm:"autoUpdateTime" gorm:"column:update_time"`
 	Shared          int        `json:"shared" gorm:"column:shared"`
