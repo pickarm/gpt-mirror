@@ -4,6 +4,7 @@ import (
 	v1 "PandoraHelper/api/v1"
 	"PandoraHelper/internal/model"
 	"PandoraHelper/internal/repository"
+	apptransport "PandoraHelper/internal/transport"
 	"context"
 	"errors"
 	"fmt"
@@ -127,11 +128,27 @@ func (s *accountService) RefreshAccount(ctx context.Context, id int64) error {
 }
 
 func (s *accountService) Update(ctx context.Context, account *model.Account) error {
+	if err := validateAccountProxy(account.ProxyURL); err != nil {
+		return err
+	}
 	return s.accountRepository.Update(ctx, account)
 }
 
 func (s *accountService) Create(ctx context.Context, account *model.Account) error {
+	if err := validateAccountProxy(account.ProxyURL); err != nil {
+		return err
+	}
 	return s.accountRepository.Create(ctx, account)
+}
+
+func validateAccountProxy(proxyURL string) error {
+	if proxyURL == "" {
+		return nil
+	}
+	if _, err := apptransport.ParseProxy(proxyURL); err != nil {
+		return fmt.Errorf("invalid account proxy: %w", err)
+	}
+	return nil
 }
 
 func (s *accountService) SearchAccount(ctx context.Context, accountType string, keyword string) ([]*model.Account, error) {
