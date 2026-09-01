@@ -93,6 +93,17 @@ func (p *encryptedProvider) Delete(ctx context.Context, accountID uint) error {
 	return p.store.Delete(ctx, accountID)
 }
 
+func (p *encryptedProvider) RecordHealth(ctx context.Context, accountID uint, health Health) error {
+	if health.State == "" {
+		health.State = StateUnknown
+	}
+	if health.CheckedAt.IsZero() {
+		health.CheckedAt = p.now()
+	}
+	health.Message = appsecurity.RedactText(health.Message)
+	return p.store.UpdateHealth(ctx, accountID, health)
+}
+
 func (p *encryptedProvider) Validate(ctx context.Context, accountID uint) (Health, error) {
 	secret, err := p.Resolve(ctx, accountID)
 	if err != nil {
@@ -116,7 +127,7 @@ func (p *encryptedProvider) Validate(ctx context.Context, accountID uint) (Healt
 		health.CheckedAt = p.now()
 	}
 	health.Message = appsecurity.RedactText(health.Message)
-	if updateErr := p.store.UpdateHealth(ctx, accountID, health); updateErr != nil && err == nil {
+	if updateErr := p.RecordHealth(ctx, accountID, health); updateErr != nil && err == nil {
 		return health, updateErr
 	}
 	return health, err
