@@ -1,9 +1,6 @@
 services:
   browser-worker:
-    build:
-      context: .
-      dockerfile: browser-worker/Dockerfile
-    image: gpt-mirror-browser:local
+    image: "${GPT_MIRROR_BROWSER_IMAGE:-ghcr.io/pickarm/gpt-mirror-browser}:${GPT_MIRROR_VERSION:-latest}"
     container_name: gpt-mirror-browser
     restart: unless-stopped
     shm_size: "1gb"
@@ -24,10 +21,7 @@ services:
       start_period: 15s
 
   gpt-mirror:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: gpt-mirror:local
+    image: "${GPT_MIRROR_IMAGE:-ghcr.io/pickarm/gpt-mirror}:${GPT_MIRROR_VERSION:-latest}"
     container_name: gpt-mirror
     restart: unless-stopped
     depends_on:

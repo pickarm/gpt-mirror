@@ -21,7 +21,11 @@
   "chatgpt": {
     "base_url": "https://chatgpt.com",
     "conversation_path": "",
-    "user_agent": ""
+    "user_agent": "",
+    "browser": {
+      "enabled": false,
+      "socket_path": "/run/gpt-mirror/browser.sock"
+    }
   },
   "moderation": {
     "apikey": "",

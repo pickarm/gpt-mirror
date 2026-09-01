@@ -1,0 +1,13 @@
+{
+  "name": "gpt-mirror-browser-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-backed ChatGPT write executor for GPT Mirror",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}

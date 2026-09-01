@@ -27,6 +27,7 @@ type WebProvider struct {
 	credentials      credentialprovider.Provider
 	accounts         repository.AccountRepository
 	transportFactory *apptransport.Factory
+	browser          BrowserExecutor
 	baseURL          *url.URL
 	conversationPath string
 	userAgent        string
@@ -38,6 +39,7 @@ type webSession struct {
 	cookie    string
 	deviceID  string
 	userAgent string
+	proxyURL  string
 }
 
 func NewWebProvider(
@@ -72,6 +74,7 @@ func NewWebProvider(
 		credentials:      credentials,
 		accounts:         accounts,
 		transportFactory: transportFactory,
+		browser:          NewBrowserWorkerExecutor(conf),
 		baseURL:          parsed,
 		conversationPath: conversationPath,
 		userAgent:        userAgent,
@@ -119,11 +122,12 @@ func (p *WebProvider) session(ctx context.Context, account AccountRef, operation
 	}
 
 	return &webSession{
-		client:    client,
+		client:    p.browserWriteClient(client, cookie, proxyURL),
 		token:     token,
 		cookie:    cookie,
 		deviceID:  cookieValue(cookie, "oai-did"),
 		userAgent: p.userAgent,
+		proxyURL:  proxyURL,
 	}, nil
 }
 
