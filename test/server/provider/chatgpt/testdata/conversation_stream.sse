@@ -1,0 +1,8 @@
+data: {"conversation_id":"conv-1","message":{"id":"msg-a","author":{"role":"assistant"},"content":{"content_type":"text","parts":["Hel"]},"create_time":1788269400.0,"status":"in_progress","end_turn":false}}
+
+data: {"conversation_id":"conv-1","message":{"id":"msg-a","author":{"role":"assistant"},"content":{"content_type":"text","parts":["Hello"]},"create_time":1788269400.0,"status":"in_progress","end_turn":false}}
+
+data: {"conversation_id":"conv-1","message":{"id":"msg-a","author":{"role":"assistant"},"content":{"content_type":"text","parts":["Hello"]},"create_time":1788269400.0,"status":"finished_successfully","end_turn":true}}
+
+data: [DONE]
+

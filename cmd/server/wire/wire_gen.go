@@ -13,6 +13,7 @@ import (
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
+	apptransport "PandoraHelper/internal/transport"
 	"PandoraHelper/pkg/app"
 	"PandoraHelper/pkg/jwt"
 	"PandoraHelper/pkg/log"
@@ -31,12 +32,6 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	repositoryRepository := repository.NewRepository(logger, db)
 	transaction := repository.NewTransaction(repositoryRepository)
 	sidSid := sid.NewSid()
-	provider := chatgptprovider.NewUnavailableProvider()
-	serviceService := service.NewService(transaction, logger, sidSid, jwtJWT, provider)
-	userService := service.NewUserService(serviceService, viperViper)
-	userHandler := handler.NewUserHandler(handlerHandler, userService, viperViper)
-	shareRepository := repository.NewShareRepository(repositoryRepository)
-	accountRepository := repository.NewAccountRepository(repositoryRepository)
 	credentialStore := repository.NewCredentialRepository(repositoryRepository)
 	credentialCipher, err := credentialprovider.NewCipher(viperViper)
 	if err != nil {
@@ -44,6 +39,19 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	}
 	credentialValidator := credentialprovider.NewUnavailableValidator()
 	credentialProvider := credentialprovider.NewProvider(credentialStore, credentialCipher, credentialValidator)
+	accountRepository := repository.NewAccountRepository(repositoryRepository)
+	transportFactory, err := apptransport.NewFactoryFromViper(viperViper)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := chatgptprovider.NewWebProvider(credentialProvider, accountRepository, transportFactory, viperViper)
+	if err != nil {
+		return nil, nil, err
+	}
+	serviceService := service.NewService(transaction, logger, sidSid, jwtJWT, provider)
+	userService := service.NewUserService(serviceService, viperViper)
+	userHandler := handler.NewUserHandler(handlerHandler, userService, viperViper)
+	shareRepository := repository.NewShareRepository(repositoryRepository)
 	coordinator := service.NewServiceCoordinator(serviceService, accountRepository, shareRepository, credentialProvider, viperViper)
 	shareService := service.NewShareService(serviceService, shareRepository, viperViper, coordinator)
 	shareHandler := handler.NewShareHandler(handlerHandler, shareService)
@@ -63,7 +71,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewCredentialRepository, repository.NewShareRepository)
 
-var providerSet = wire.NewSet(chatgptprovider.NewUnavailableProvider, credentialprovider.NewCipher, credentialprovider.NewUnavailableValidator, credentialprovider.NewProvider)
+var providerSet = wire.NewSet(apptransport.NewFactoryFromViper, credentialprovider.NewCipher, credentialprovider.NewUnavailableValidator, credentialprovider.NewProvider, chatgptprovider.NewWebProvider)
 
 var serviceCoordinatorSet = wire.NewSet(service.NewServiceCoordinator)
 
