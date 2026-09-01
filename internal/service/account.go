@@ -70,12 +70,14 @@ func (s *accountService) UpdateOneApiChannelToken(ctx context.Context, id int64,
 	if err != nil {
 		return err
 	}
-	s.logger.Info("GetOneApiChannel", zap.Any("result", res))
+	s.logger.Info("GetOneApiChannel", zap.Int("statusCode", res.StatusCode()))
 
 	param := resp.Data
 	param.Key = token
 	res, err = client.R().SetHeader("Authorization", "Bearer "+oneToken).SetBody(param).Put(oneURL)
-	s.logger.Info("UpdateOneApiChannelToken", zap.Any("result", res))
+	if res != nil {
+		s.logger.Info("UpdateOneApiChannelToken", zap.Int("statusCode", res.StatusCode()))
+	}
 	return err
 }
 
@@ -95,7 +97,7 @@ func (s *accountService) GetOneApiChannelList(ctx context.Context) ([]*model.One
 	if err != nil {
 		return nil, err
 	}
-	s.logger.Info("GetOneApiChannelList", zap.Any("result", resp))
+	s.logger.Info("GetOneApiChannelList", zap.Int("statusCode", resp.StatusCode()))
 	return result.Data, nil
 }
 
@@ -225,7 +227,6 @@ func (s *accountService) Create(ctx context.Context, account *model.Account) err
 			if err := s.credentialProvider.Put(txCtx, persisted.ID, secret); err != nil {
 				return err
 			}
-		}
 		return nil
 	}); err != nil {
 		return err
