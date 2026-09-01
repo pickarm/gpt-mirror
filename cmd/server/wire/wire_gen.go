@@ -8,6 +8,7 @@ package wire
 
 import (
 	"PandoraHelper/internal/handler"
+	chatgptprovider "PandoraHelper/internal/provider/chatgpt"
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
@@ -29,7 +30,8 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	repositoryRepository := repository.NewRepository(logger, db)
 	transaction := repository.NewTransaction(repositoryRepository)
 	sidSid := sid.NewSid()
-	serviceService := service.NewService(transaction, logger, sidSid, jwtJWT)
+	provider := chatgptprovider.NewUnavailableProvider()
+	serviceService := service.NewService(transaction, logger, sidSid, jwtJWT, provider)
 	userService := service.NewUserService(serviceService, viperViper)
 	userHandler := handler.NewUserHandler(handlerHandler, userService, viperViper)
 	shareRepository := repository.NewShareRepository(repositoryRepository)
@@ -53,9 +55,11 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewShareRepository)
 
+var providerSet = wire.NewSet(chatgptprovider.NewUnavailableProvider)
+
 var serviceCoordinatorSet = wire.NewSet(service.NewServiceCoordinator)
 
-var serviceSet = wire.NewSet(service.NewService, service.NewUserService, serviceCoordinatorSet, service.NewAccountService, service.NewShareService, server.NewTask)
+var serviceSet = wire.NewSet(providerSet, service.NewService, service.NewUserService, serviceCoordinatorSet, service.NewAccountService, service.NewShareService, server.NewTask)
 
 var migrateSet = wire.NewSet(server.NewMigrate)
 
