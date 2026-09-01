@@ -12,7 +12,12 @@ services:
     volumes:
       - browser-runtime:/run/gpt-mirror
     healthcheck:
-      test: ["CMD-SHELL", "test -S /run/gpt-mirror/browser.sock"]
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>{let b='';x.on('data',c=>b+=c);x.on('end',()=>process.exit(x.statusCode===200&&b.includes('ok')?0:1));});r.on('error',()=>process.exit(1));r.setTimeout(2000,()=>{r.destroy();process.exit(1);});
       interval: 10s
       timeout: 3s
       retries: 12
