@@ -94,7 +94,11 @@ func (p *WebProvider) session(ctx context.Context, account AccountRef, operation
 		}
 		return nil, &Error{Kind: kind, Operation: operation, Err: errors.New("account credential is unavailable")}
 	}
-	client, _, err := p.transportFactory.Client(modelAccount.ProxyURL)
+	proxyURL := modelAccount.ProxyURL
+	if secret.ProxyURL != "" {
+		proxyURL = secret.ProxyURL
+	}
+	client, _, err := p.transportFactory.Client(proxyURL)
 	if err != nil {
 		return nil, &Error{Kind: ErrorKindTransport, Operation: operation, Err: err}
 	}
