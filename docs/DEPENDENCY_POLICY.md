@@ -2,14 +2,15 @@
 
 Dependency updates are reviewed as isolated maintenance changes. Dependabot provides visibility and pull requests; it is not an automatic merge mechanism.
 
-## Monitored ecosystems
+## Automatically monitored ecosystems
 
 Dependabot checks these ecosystems weekly:
 
 - Go modules at the repository root;
 - frontend packages and the pnpm lockfile under `frontend/` through the npm ecosystem integration;
-- GitHub Actions workflows;
-- the Dockerfile under `deploy/build/`.
+- GitHub Actions workflows.
+
+The Docker base image is intentionally not listed in `dependabot.yml`. The project pins it through `ARG ALPINE_IMAGE` and uses that argument in a multi-stage Dockerfile. GitHub documents that Dependabot does not update Docker images specified through `ARG` and has limitations with multi-stage Dockerfiles, so a Docker Dependabot entry would provide misleading coverage rather than reliable visibility.
 
 ## Pull request grouping
 
@@ -41,7 +42,7 @@ Major runtime or build-tool upgrades are evaluated separately. Lockfile changes 
 
 ### Docker
 
-Base images remain version- and digest-pinned. A Dependabot proposal does not remove the requirement to verify the exact multi-platform digest and run the Docker build checks.
+Base images remain version- and digest-pinned according to `docs/DOCKER_BASE_IMAGE.md`. Because the current `ARG` + multi-stage form is not reliably updateable by Dependabot, Docker updates are a manual review item: verify the supported release, exact multi-platform digest, and full Docker CI before merge.
 
 ### GitHub Actions
 
