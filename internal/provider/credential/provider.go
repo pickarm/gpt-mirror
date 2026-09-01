@@ -1,6 +1,7 @@
 package credential
 
 import (
+	appsecurity "PandoraHelper/internal/security"
 	"context"
 	"encoding/json"
 	"errors"
@@ -59,7 +60,7 @@ func (p *encryptedProvider) Status(ctx context.Context, accountID uint) (Status,
 	return Status{
 		HasCredential: true,
 		State:         record.State,
-		Message:       record.Message,
+		Message:       appsecurity.RedactText(record.Message),
 		CheckedAt:     record.CheckedAt,
 	}, nil
 }
@@ -99,6 +100,7 @@ func (p *encryptedProvider) Validate(ctx context.Context, accountID uint) (Healt
 		if errors.Is(err, ErrCredentialNotFound) {
 			health.Message = "credential is not configured"
 		}
+		health.Message = appsecurity.RedactText(health.Message)
 		health.CheckedAt = p.now()
 		return health, err
 	}
@@ -113,6 +115,7 @@ func (p *encryptedProvider) Validate(ctx context.Context, accountID uint) (Healt
 	if health.CheckedAt.IsZero() {
 		health.CheckedAt = p.now()
 	}
+	health.Message = appsecurity.RedactText(health.Message)
 	if updateErr := p.store.UpdateHealth(ctx, accountID, health); updateErr != nil && err == nil {
 		return health, updateErr
 	}
