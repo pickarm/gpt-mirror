@@ -40,6 +40,7 @@ _No changes yet._
 - Conversation content is treated as upstream-owned; local persistence remains metadata-oriented rather than becoming a second authoritative chat database.
 - Account read APIs expose credential/proxy state without returning raw secret fields.
 - Browser-worker startup no longer depends on `xvfb-run` wrapping the Node control plane; Xvfb is managed as display infrastructure while Node owns the Unix-socket server lifecycle.
+- Release image publication isolates server and browser-worker builds into independent jobs and retries a failed SBOM/provenance build once after backoff, so transient registry failures do not require lowering release attestations.
 
 ### Security
 
