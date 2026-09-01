@@ -39,6 +39,16 @@ func setDefaults(conf *viper.Viper) {
 	conf.SetDefault("database.driver", "sqlite")
 	conf.SetDefault("database.dsn", "./data/data.db")
 
+	// Outbound transport settings. The global proxy is optional and can be
+	// overridden by a per-account proxy URL.
+	conf.SetDefault("transport.proxy_url", "")
+	conf.SetDefault("transport.connect_timeout", "10s")
+	conf.SetDefault("transport.tls_handshake_timeout", "10s")
+	conf.SetDefault("transport.response_header_timeout", "30s")
+	conf.SetDefault("transport.idle_conn_timeout", "90s")
+	conf.SetDefault("transport.max_idle_conns", 100)
+	conf.SetDefault("transport.max_idle_conns_per_host", 20)
+
 	// Automatic account/share maintenance is disabled until the provider layer
 	// owns credential refresh and remote share/session behavior.
 	conf.SetDefault("account.refresh.enabled", false)
