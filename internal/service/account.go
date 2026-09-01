@@ -173,8 +173,17 @@ func (s *accountService) Update(ctx context.Context, account *model.Account) err
 	existing.Shared = account.Shared
 	existing.OneApiChannelId = account.OneApiChannelId
 
-	secretToPersist := incomingSecret
-	if secretToPersist.Empty() && !legacySecret.Empty() && s.credentialProvider.CanPersist() {
+	var secretToPersist credentialprovider.Secret
+	if !incomingSecret.Empty() {
+		baseSecret, resolveErr := s.credentialProvider.Resolve(ctx, existing.ID)
+		if resolveErr != nil {
+			if !errors.Is(resolveErr, credentialprovider.ErrCredentialNotFound) {
+				return resolveErr
+			}
+			baseSecret = legacySecret
+		}
+		secretToPersist = mergeCredential(baseSecret, incomingSecret)
+	} else if !legacySecret.Empty() && s.credentialProvider.CanPersist() {
 		secretToPersist = legacySecret
 	}
 
@@ -247,6 +256,35 @@ func credentialFromAccount(account *model.Account) credentialprovider.Secret {
 		RefreshToken:   account.RefreshToken,
 		SessionKey:     account.SessionKey,
 	}
+}
+
+func mergeCredential(base credentialprovider.Secret, patch credentialprovider.Secret) credentialprovider.Secret {
+	merged := base
+	if merged.Representation == "" {
+		merged.Representation = patch.Representation
+	}
+	if patch.Password != "" {
+		merged.Password = patch.Password
+	}
+	if patch.SessionToken != "" {
+		merged.SessionToken = patch.SessionToken
+	}
+	if patch.AccessToken != "" {
+		merged.AccessToken = patch.AccessToken
+	}
+	if patch.RefreshToken != "" {
+		merged.RefreshToken = patch.RefreshToken
+	}
+	if patch.SessionKey != "" {
+		merged.SessionKey = patch.SessionKey
+	}
+	if patch.Cookie != "" {
+		merged.Cookie = patch.Cookie
+	}
+	if patch.Reference != "" {
+		merged.Reference = patch.Reference
+	}
+	return merged
 }
 
 func clearAccountCredentialFields(account *model.Account) {
