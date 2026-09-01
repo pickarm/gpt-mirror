@@ -13,7 +13,8 @@ import (
 const maxSSELineSize = 8 << 20
 
 type sseStream struct {
-	mu               sync.Mutex
+	recvMu           sync.Mutex
+	closeMu          sync.Mutex
 	body             io.ReadCloser
 	scanner          *bufio.Scanner
 	operation        string
@@ -41,10 +42,13 @@ func newSSEStream(body io.ReadCloser, operation string) Stream {
 }
 
 func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Only one caller may advance the scanner/parser at a time. Close uses a
+	// separate lock so it can close the underlying response body while Scan is
+	// blocked, which makes shutdown/cancellation deterministic.
+	s.recvMu.Lock()
+	defer s.recvMu.Unlock()
 
-	if s.closed {
+	if s.isClosed() {
 		return StreamEvent{}, io.EOF
 	}
 	if len(s.queue) > 0 {
@@ -68,6 +72,9 @@ func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
 		}
 
 		if !s.scanner.Scan() {
+			if s.isClosed() {
+				return StreamEvent{}, io.EOF
+			}
 			if len(s.pendingData) > 0 {
 				s.flushEvent()
 				if len(s.queue) > 0 {
@@ -115,17 +122,26 @@ func (s *sseStream) Recv(ctx context.Context) (StreamEvent, error) {
 }
 
 func (s *sseStream) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.closeMu.Lock()
 	if s.closed {
+		s.closeMu.Unlock()
 		return nil
 	}
 	s.closed = true
-	s.done = true
-	if s.body != nil {
-		return s.body.Close()
+	body := s.body
+	s.closeMu.Unlock()
+
+	if body != nil {
+		return body.Close()
 	}
 	return nil
+}
+
+func (s *sseStream) isClosed() bool {
+	s.closeMu.Lock()
+	closed := s.closed
+	s.closeMu.Unlock()
+	return closed
 }
 
 func (s *sseStream) flushEvent() {
