@@ -44,6 +44,26 @@ func (p *encryptedProvider) Resolve(ctx context.Context, accountID uint) (Secret
 	return secret, nil
 }
 
+func (p *encryptedProvider) Status(ctx context.Context, accountID uint) (Status, error) {
+	record, err := p.store.Get(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, ErrCredentialNotFound) {
+			return Status{
+				HasCredential: false,
+				State:         StateUnknown,
+				Message:       "credential is not configured",
+			}, nil
+		}
+		return Status{}, err
+	}
+	return Status{
+		HasCredential: true,
+		State:         record.State,
+		Message:       record.Message,
+		CheckedAt:     record.CheckedAt,
+	}, nil
+}
+
 func (p *encryptedProvider) Put(ctx context.Context, accountID uint, secret Secret) error {
 	if secret.Empty() {
 		return nil
