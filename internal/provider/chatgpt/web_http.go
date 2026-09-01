@@ -205,8 +205,9 @@ func (p *WebProvider) doJSON(ctx context.Context, session *webSession, method, p
 
 func (p *WebProvider) resolveURL(path string) string {
 	base := *p.baseURL
-	base.Path = strings.TrimRight(base.Path, "/") + "/" + strings.TrimLeft(path, "/")
-	base.RawQuery = ""
+	pathPart, rawQuery, _ := strings.Cut(path, "?")
+	base.Path = strings.TrimRight(base.Path, "/") + "/" + strings.TrimLeft(pathPart, "/")
+	base.RawQuery = rawQuery
 	base.Fragment = ""
 	return base.String()
 }
