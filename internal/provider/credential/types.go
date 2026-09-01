@@ -34,7 +34,8 @@ var (
 
 // Secret is the internal credential representation. It intentionally supports
 // multiple forms so services do not need to know whether a future provider uses
-// tokens, cookies, or an external/browser-profile reference.
+// tokens, cookies, an external/browser-profile reference, or authenticated
+// proxy credentials. Every field in Secret is encrypted at rest by Provider.
 type Secret struct {
 	Representation Representation `json:"representation"`
 	Password       string         `json:"password,omitempty"`
@@ -44,6 +45,7 @@ type Secret struct {
 	SessionKey     string         `json:"session_key,omitempty"`
 	Cookie         string         `json:"cookie,omitempty"`
 	Reference      string         `json:"reference,omitempty"`
+	ProxyURL       string         `json:"proxy_url,omitempty"`
 }
 
 func (s Secret) Empty() bool {
@@ -53,7 +55,8 @@ func (s Secret) Empty() bool {
 		s.RefreshToken == "" &&
 		s.SessionKey == "" &&
 		s.Cookie == "" &&
-		s.Reference == ""
+		s.Reference == "" &&
+		s.ProxyURL == ""
 }
 
 func (s Secret) Kind() string {
