@@ -68,8 +68,7 @@ func (r *accountRepository) Create(ctx context.Context, account *model.Account) 
 }
 
 func (r *accountRepository) DeleteAccount(ctx context.Context, id int64) error {
-	r.DB(ctx).Delete(&model.Account{}, id)
-	return nil
+	return r.DB(ctx).Delete(&model.Account{}, id).Error
 }
 
 func (r *accountRepository) GetAccount(ctx context.Context, id int64) (*model.Account, error) {
