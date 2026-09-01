@@ -131,6 +131,19 @@ func TestBrowserWorkerExecutorMapsStreamError(t *testing.T) {
 	}
 }
 
+func TestBrowserWorkerExecutorUnavailableSocket(t *testing.T) {
+	socketPath := filepath.Join(t.TempDir(), "missing.sock")
+	executor := browserExecutorForSocket(socketPath)
+
+	_, err := executor.Send(context.Background(), provider.BrowserSendRequest{
+		Message: "hello",
+		Cookie:  "session=test-session",
+	})
+	if !provider.IsKind(err, provider.ErrorKindUnavailable) {
+		t.Fatalf("expected unavailable error for missing worker socket, got %v", err)
+	}
+}
+
 func TestBrowserWorkerExecutorDisabled(t *testing.T) {
 	conf := viper.New()
 	conf.Set("chatgpt.browser.enabled", false)
