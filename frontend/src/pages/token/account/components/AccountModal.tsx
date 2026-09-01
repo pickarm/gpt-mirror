@@ -85,6 +85,22 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
         <Form.Item<AccountAddReq>
           label={
             <Space>
+              账号代理
+              <Tooltip title={"留空时使用全局 transport.proxy_url；支持 http、https、socks5、socks5h。优先级：账号代理 > 全局代理 > 直连"}>
+                <InfoCircleOutlined/>
+              </Tooltip>
+            </Space>
+          }
+          name="proxyUrl"
+        >
+          <Input.Password
+            placeholder="例如 socks5h://user:pass@127.0.0.1:1080"
+            autoComplete="new-password"
+          />
+        </Form.Item>
+        <Form.Item<AccountAddReq>
+          label={
+            <Space>
               共享
               <Tooltip title={"共享记录会保留在本地；Provider 接入完成前无法生成远端登录会话"} >
                 <InfoCircleOutlined/>

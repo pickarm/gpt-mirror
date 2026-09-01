@@ -13,7 +13,8 @@ type Account struct {
 	AccountType     string     `json:"accountType" gorm:"column:account_type" gorm:"default:chatgpt"`
 	SessionKey      string     `json:"sessionKey" gorm:"column:session_key"`
 	OneApiChannelId string     `json:"oneApiChannelId" gorm:"column:one_api_channel_id;default:''"`
-	Shares          []Share    `gorm:"foreignKey:AccountID;constraint:OnDelete:CASCADE"` // 外键关系
+	ProxyURL        string     `json:"proxyUrl" gorm:"column:proxy_url;default:''"`
+	Shares          []Share    `gorm:"foreignKey:AccountID;constraint:OnDelete:CASCADE"`
 }
 
 func (m *Account) TableName() string {

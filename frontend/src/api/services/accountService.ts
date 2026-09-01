@@ -16,7 +16,6 @@ export enum AccountApi {
 
 const getAccountList = () =>
   apiClient.get<Account[]>({ url: AccountApi.list }).then((res) => {
-    // 将shareList转为json对象
     res.forEach((item) => {
       if (item.shareList) {
         item.shareList = JSON.parse(item.shareList);
@@ -27,7 +26,6 @@ const getAccountList = () =>
 
 const searchAccountList = (email: string, accountType: ProductType ) =>
   apiClient.post<Account[]>({ url: AccountApi.search, data: { email, accountType } }).then((res) => {
-    // 将shareList转为json对象
     res.forEach((item) => {
       if (item.shareList) {
         item.shareList = JSON.parse(item.shareList);
@@ -45,6 +43,7 @@ export interface AccountAddReq {
   refreshToken?: string;
   accessToken?: string;
   oneApiChannelId?: number;
+  proxyUrl?: string;
 }
 
 interface ShareAccountListResp {

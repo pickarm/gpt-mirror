@@ -9,6 +9,15 @@
     "rate": 1000,
     "title": "GPT Mirror"
   },
+  "transport": {
+    "proxy_url": "",
+    "connect_timeout": "10s",
+    "tls_handshake_timeout": "10s",
+    "response_header_timeout": "30s",
+    "idle_conn_timeout": "90s",
+    "max_idle_conns": 100,
+    "max_idle_conns_per_host": 20
+  },
   "moderation": {
     "apikey": "",
     "apiurl": "",
