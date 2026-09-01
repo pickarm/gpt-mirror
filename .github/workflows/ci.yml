@@ -67,6 +67,8 @@ jobs:
         run: go test ./test/server/...
       - name: Build server
         run: go build -ldflags='-s -w' -o /tmp/PandoraHelper ./cmd/server
+      - name: Build web mirror probe
+        run: go build -ldflags='-s -w' -o /tmp/webmirror-probe ./cmd/webmirror-probe
 
   frontend:
     name: Frontend build
