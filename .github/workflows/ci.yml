@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Validate shell release tooling
+        run: bash -n scripts/rc-live-check.sh browser-worker/entrypoint.sh deploy/docker-entrypoint.sh
       - name: Reject obsolete gateway references in active source
         shell: bash
         run: |
