@@ -18,11 +18,11 @@ const maxProbeBody = 2 << 20
 type Verdict string
 
 const (
-	VerdictTransparent       Verdict = "transparent"
-	VerdictRewriteRequired   Verdict = "rewrite_required"
-	VerdictBrowserRequired   Verdict = "browser_session_required"
+	VerdictTransparent        Verdict = "transparent"
+	VerdictRewriteRequired    Verdict = "rewrite_required"
+	VerdictBrowserRequired    Verdict = "browser_session_required"
 	VerdictExternalDependency Verdict = "external_dependency"
-	VerdictInconclusive      Verdict = "inconclusive"
+	VerdictInconclusive       Verdict = "inconclusive"
 )
 
 type Area string
@@ -146,7 +146,7 @@ func analyzeRedirect(header http.Header, upstream *url.URL) Finding {
 	if err != nil {
 		return Finding{Area: AreaRedirects, Verdict: VerdictRewriteRequired, Summary: "redirect is not safely parseable", Evidence: []string{location}}
 	}
-	if parsed.IsAbs() && strings.EqualFold(parsed.Hostname(), upstream.Hostname()) {
+	if parsed.IsAbs() && sameOrigin(parsed, upstream) {
 		return Finding{Area: AreaRedirects, Verdict: VerdictRewriteRequired, Summary: "absolute upstream redirect must be mapped back to the mirror origin", Evidence: []string{location}}
 	}
 	if parsed.IsAbs() {
@@ -217,7 +217,7 @@ func analyzeCORS(header http.Header, upstream *url.URL) Finding {
 		return Finding{Area: AreaCORS, Verdict: VerdictTransparent, Summary: "wildcard CORS is origin-portable", Evidence: []string{allowOrigin}}
 	}
 	parsed, err := url.Parse(allowOrigin)
-	if err == nil && strings.EqualFold(parsed.Hostname(), upstream.Hostname()) {
+	if err == nil && sameOrigin(parsed, upstream) {
 		return Finding{Area: AreaCORS, Verdict: VerdictRewriteRequired, Summary: "CORS explicitly trusts the upstream origin", Evidence: []string{allowOrigin}}
 	}
 	return Finding{Area: AreaCORS, Verdict: VerdictExternalDependency, Summary: "CORS trusts a different fixed origin", Evidence: []string{allowOrigin}}
@@ -334,6 +334,32 @@ func absoluteHosts(body string) map[string]struct{} {
 		}
 	}
 	return hosts
+}
+
+func sameOrigin(left, right *url.URL) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	return strings.EqualFold(left.Scheme, right.Scheme) &&
+		strings.EqualFold(left.Hostname(), right.Hostname()) &&
+		effectivePort(left) == effectivePort(right)
+}
+
+func effectivePort(value *url.URL) string {
+	if value == nil {
+		return ""
+	}
+	if port := value.Port(); port != "" {
+		return port
+	}
+	switch strings.ToLower(value.Scheme) {
+	case "http", "ws":
+		return "80"
+	case "https", "wss":
+		return "443"
+	default:
+		return ""
+	}
 }
 
 func mapKeys(values map[string]struct{}) []string {
