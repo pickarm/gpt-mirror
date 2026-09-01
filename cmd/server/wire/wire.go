@@ -45,6 +45,7 @@ var serviceSet = wire.NewSet(
 	providerSet,
 	service.NewService,
 	service.NewUserService,
+	service.NewConversationService,
 	serviceCoordinatorSet,
 	service.NewAccountService,
 	service.NewShareService,
@@ -60,6 +61,7 @@ var handlerSet = wire.NewSet(
 	handler.NewUserHandler,
 	handler.NewShareHandler,
 	handler.NewAccountHandler,
+	handler.NewConversationHandler,
 	handler.NewHealthCheckHandler,
 )
 
