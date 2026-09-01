@@ -6,6 +6,10 @@ The project uses semantic versioning for stable release tags.
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [1.0.0-rc1] - 2026-09-01
+
 ### Added
 
 - ChatGPT Web provider boundary with typed models, conversation lifecycle, streaming and error classification.
