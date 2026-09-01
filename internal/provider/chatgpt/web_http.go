@@ -122,7 +122,7 @@ func (p *WebProvider) session(ctx context.Context, account AccountRef, operation
 	}
 
 	return &webSession{
-		client:    client,
+		client:    p.browserWriteClient(client, cookie, proxyURL),
 		token:     token,
 		cookie:    cookie,
 		deviceID:  cookieValue(cookie, "oai-did"),
