@@ -7,8 +7,8 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-co-op/gocron v1.28.2
-	github.com/go-resty/resty/v2 v2.12.0
-	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/go-resty/resty/v2 v2.17.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/wire v0.5.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pquerna/otp v1.4.0
