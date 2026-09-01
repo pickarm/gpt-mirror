@@ -20,15 +20,19 @@ const (
 // ProxySpec is a validated outbound proxy configuration. The parsed URL is
 // kept private so callers cannot accidentally log credentials.
 type ProxySpec struct {
-	scheme    ProxyScheme
-	proxyURL  *url.URL
-	redacted  string
-	remoteDNS bool
+	scheme         ProxyScheme
+	proxyURL       *url.URL
+	redacted       string
+	endpoint       string
+	hasCredentials bool
+	remoteDNS      bool
 }
 
-func (p ProxySpec) Scheme() ProxyScheme { return p.scheme }
-func (p ProxySpec) Redacted() string    { return p.redacted }
-func (p ProxySpec) RemoteDNS() bool     { return p.remoteDNS }
+func (p ProxySpec) Scheme() ProxyScheme    { return p.scheme }
+func (p ProxySpec) Redacted() string       { return p.redacted }
+func (p ProxySpec) Endpoint() string       { return p.endpoint }
+func (p ProxySpec) HasCredentials() bool   { return p.hasCredentials }
+func (p ProxySpec) RemoteDNS() bool        { return p.remoteDNS }
 
 func ParseProxy(raw string) (ProxySpec, error) {
 	raw = strings.TrimSpace(raw)
@@ -65,11 +69,16 @@ func ParseProxy(raw string) (ProxySpec, error) {
 	}
 	normalized.Path = ""
 
+	endpoint := normalized
+	endpoint.User = nil
+
 	return ProxySpec{
-		scheme:    scheme,
-		proxyURL:  &normalized,
-		redacted:  RedactProxyURL(normalized.String()),
-		remoteDNS: scheme == ProxySchemeSOCKS5H,
+		scheme:         scheme,
+		proxyURL:       &normalized,
+		redacted:       RedactProxyURL(normalized.String()),
+		endpoint:       endpoint.String(),
+		hasCredentials: normalized.User != nil,
+		remoteDNS:      scheme == ProxySchemeSOCKS5H,
 	}, nil
 }
 
