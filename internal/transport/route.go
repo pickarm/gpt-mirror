@@ -11,9 +11,10 @@ const (
 )
 
 type RouteInfo struct {
-	Source   RouteSource
-	Scheme   ProxyScheme
-	ProxyURL string
+	Source    RouteSource
+	Scheme    ProxyScheme
+	ProxyURL  string
+	RemoteDNS bool
 }
 
 type route struct {
@@ -28,7 +29,7 @@ func resolveRoute(accountProxyURL, globalProxyURL string) (route, error) {
 			return route{}, fmt.Errorf("account proxy: %w", err)
 		}
 		return route{
-			info: RouteInfo{Source: RouteSourceAccount, Scheme: spec.Scheme(), ProxyURL: spec.Redacted()},
+			info: RouteInfo{Source: RouteSourceAccount, Scheme: spec.Scheme(), ProxyURL: spec.Redacted(), RemoteDNS: spec.RemoteDNS()},
 			proxy: &spec,
 		}, nil
 	}
@@ -38,7 +39,7 @@ func resolveRoute(accountProxyURL, globalProxyURL string) (route, error) {
 			return route{}, fmt.Errorf("global proxy: %w", err)
 		}
 		return route{
-			info: RouteInfo{Source: RouteSourceGlobal, Scheme: spec.Scheme(), ProxyURL: spec.Redacted()},
+			info: RouteInfo{Source: RouteSourceGlobal, Scheme: spec.Scheme(), ProxyURL: spec.Redacted(), RemoteDNS: spec.RemoteDNS()},
 			proxy: &spec,
 		}, nil
 	}
