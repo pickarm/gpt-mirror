@@ -1,4 +1,6 @@
-FROM alpine:latest AS builder
+ARG ALPINE_IMAGE=alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+
+FROM ${ALPINE_IMAGE} AS builder
 WORKDIR /app
 ARG VERSION
 ARG TARGETPLATFORM
@@ -13,7 +15,7 @@ RUN if [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
         cp /app/PandoraHelper-amd64 /app/PandoraHelper; \
     fi
 
-FROM alpine:latest
+FROM ${ALPINE_IMAGE}
 WORKDIR /app
 ARG TARGETPLATFORM
 
