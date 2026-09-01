@@ -44,7 +44,7 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	}
 	credentialValidator := credentialprovider.NewUnavailableValidator()
 	credentialProvider := credentialprovider.NewProvider(credentialStore, credentialCipher, credentialValidator)
-	coordinator := service.NewServiceCoordinator(serviceService, accountRepository, shareRepository, viperViper)
+	coordinator := service.NewServiceCoordinator(serviceService, accountRepository, shareRepository, credentialProvider, viperViper)
 	shareService := service.NewShareService(serviceService, shareRepository, viperViper, coordinator)
 	shareHandler := handler.NewShareHandler(handlerHandler, shareService)
 	accountService := service.NewAccountService(serviceService, accountRepository, credentialProvider, viperViper, coordinator)
