@@ -18,6 +18,8 @@ import {
   Popconfirm,
   Row,
   Space,
+  Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import Table, { ColumnsType } from 'antd/es/table';
@@ -32,9 +34,6 @@ import {
   useRefreshAccountMutation,
   useUpdateAccountMutation,
 } from '@/store/accountStore.ts';
-import ProTag from '@/theme/antd/components/tag';
-import { onCopy } from '@/utils/copy.ts';
-
 import { useAddShareMutation } from '@/store/shareStore.ts';
 
 import {ClaudeAccount, defaultShare, ProductType, Share} from '#/entity';
@@ -60,17 +59,17 @@ export default function AccountPage() {
 
   const searchEmail = Form.useWatch('email', searchForm);
 
-  const defaultAccountFormProps = {
+  const defaultAccountFormProps: AccountAddReq = {
     id: undefined,
     email: '',
     accountType: 'claude' as ProductType,
     password: '',
-    refreshToken: '',
-    accessToken: '',
     sessionKey: '',
     shared: 0,
     proxyUrl: '',
-  }
+    proxyDisplay: '',
+    hasCredential: false,
+  };
 
   const [AccountModalPros, setAccountModalProps] = useState<AccountModalProps>({
     formValue: { ...defaultAccountFormProps },
@@ -131,31 +130,30 @@ export default function AccountPage() {
       ),
     },
     {
-      title: t('token.password'),
-      dataIndex: 'password',
-      align: 'center',
-      ellipsis: true,
-      render: (text) => (
-        <Typography.Text style={{ maxWidth: 200 }} ellipsis>
-          {text}
-        </Typography.Text>
-      ),
-    },
-    {
-      title: 'Session Key',
-      dataIndex: 'sessionKey',
+      title: 'Credential',
+      key: 'credential',
       align: 'center',
       width: 150,
-      render: (_, record) =>
-        record.sessionKey ? (
-          <Input
-            value={record.sessionKey}
-            onClick={(e) => onCopy(record.sessionKey!, t, e)}
-            readOnly
-          />
-        ) : (
-          <ProTag color="error">Empty</ProTag>
-        ),
+      render: (_, record) => {
+        const state = record.credentialState ?? 'unknown';
+        const color = state === 'healthy' ? 'success' : state === 'expired' || state === 'blocked' ? 'error' : 'default';
+        return (
+          <Tooltip title={record.credentialMessage}>
+            <Tag color={color}>{record.hasCredential ? state : 'not configured'}</Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Proxy',
+      key: 'proxy',
+      align: 'center',
+      width: 220,
+      render: (_, record) => (
+        <Typography.Text style={{ maxWidth: 210 }} ellipsis>
+          {record.proxyConfigured ? record.proxyDisplay : 'global / direct'}
+        </Typography.Text>
+      ),
     },
     {
       title: t('token.shareStatus'),
@@ -287,13 +285,15 @@ export default function AccountPage() {
       show: true,
       title: t('token.edit'),
       formValue: {
-        ...prev.formValue,
         id: record.id,
         email: record.email,
-        password: record.password,
+        accountType: 'claude',
+        password: '',
         shared: record.shared,
-        sessionKey: record.sessionKey,
-        proxyUrl: record.proxyUrl,
+        sessionKey: '',
+        proxyUrl: '',
+        proxyDisplay: record.proxyDisplay,
+        hasCredential: record.hasCredential,
       },
     }));
   };
