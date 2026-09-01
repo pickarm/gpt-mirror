@@ -2,285 +2,189 @@
 
 ## Project direction
 
-GPT Mirror is intended to be a maintainable ChatGPT Web mirror/gateway, not a short-lived UI clone. The project will reuse mature generic scaffolding where it saves engineering effort, while isolating ChatGPT Web behavior behind replaceable provider and transport boundaries.
+GPT Mirror is a maintainable, self-hosted ChatGPT Web gateway. The stable product path is a thin native UI/API backed by the configured ChatGPT account; upstream conversation IDs and cloud history remain authoritative instead of being copied into an independent local chat database.
 
-The initial reference implementation is `nianhua99/PandoraHelper`, primarily for its existing Go backend, account/admin flows, persistence layer, middleware structure, frontend admin console, Docker/Kubernetes deployment scaffolding, and conversation/usage metadata handling.
+The initial generic application scaffolding was derived where appropriate from `nianhua99/PandoraHelper`. Legacy `oaifree` / `fuclaude` gateway coupling is not part of the target architecture.
 
-The legacy `oaifree` and other third-party upstream bindings are not part of the target architecture.
-
----
+Transparent reverse-proxying of the complete `chatgpt.com` website remains a separate **Experimental** track because browser challenges, CSP, cookies, service workers, WebSockets, and origin assumptions change independently of GPT Mirror.
 
 ## Engineering principles
 
-1. **Provider isolation first** — ChatGPT-specific behavior must not leak across service/repository/admin layers.
-2. **Transport isolation** — outbound proxy, HTTP, SSE, cookies, and retry behavior belong in a transport layer.
-3. **Baseline before modernization** — import and prove the upstream baseline before upgrading dependencies.
-4. **Compatibility is observable** — upstream changes should fail through probes/tests with actionable diagnostics.
-5. **Docker-first** — the default deployment path must be reproducible with Docker Compose.
-6. **No giant rewrite** — preserve useful generic scaffolding; replace only obsolete coupling.
-7. **Minimize bespoke Web UI** — prefer maintainable proxy/adaptation approaches over cloning every ChatGPT screen.
+1. **Provider isolation** — ChatGPT-specific Web behavior stays in `internal/provider/chatgpt`.
+2. **Cloud conversation authority** — do not silently fork conversation ownership into a second local chat store.
+3. **Transport isolation** — HTTP/SSE/proxy behavior is centralized and supports per-account routing.
+4. **Credentials are secrets** — encrypted at rest, redacted in API/UI/log output, never returned by normal account reads.
+5. **Compatibility is observable** — upstream breakage should surface through typed errors, tests, probes, and release gates.
+6. **Docker-first** — Compose must build and start the actual release application from source.
+7. **No fake green builds** — the release gate is `go test ./...`, not a hand-picked subset.
 
 ---
 
-# Milestones
+# v1.0 milestones
 
-## M0 — Baseline import and reproducible build
+## M0 — Reproducible baseline
 
-**Objective:** establish a clean, attributable baseline derived from PandoraHelper without functional redesign.
+**Status: complete**
 
-Deliverables:
+- [x] Preserve upstream attribution/licensing.
+- [x] Backend reproducible build.
+- [x] Frontend locked-dependency build.
+- [x] Fresh SQLite initialization.
+- [x] CI build and smoke coverage.
+- [x] Source-first Docker build.
 
-- [ ] Record exact PandoraHelper upstream commit used as the baseline.
-- [ ] Import source while preserving upstream MIT notices.
-- [ ] Confirm backend builds with the original toolchain.
-- [ ] Confirm frontend builds with its original lockfile/toolchain.
-- [ ] Confirm Docker image builds.
-- [ ] Confirm an empty/new SQLite database can initialize.
-- [ ] Document legacy dependencies and known broken integrations.
-- [ ] Add a minimal CI build check.
+## M1 — Remove obsolete gateway coupling
 
-Exit criterion:
+**Status: complete for active source**
 
-> The repository can build and start predictably before ChatGPT-specific refactoring begins.
+- [x] Remove active `oaifree` / `fuclaude` dependency.
+- [x] Add CI guard preventing legacy gateway references from returning to active source.
+- [x] Move ChatGPT Web endpoint knowledge behind the provider package.
 
----
+## M2 — ChatGPT provider boundary
 
-## M1 — Remove hard-coded oaifree coupling
+**Status: complete for v1 core scope**
 
-**Objective:** separate generic application logic from the old ChatGPT integration.
+- [x] Typed `Provider` interface.
+- [x] Typed provider errors.
+- [x] Models and health.
+- [x] Conversation list/get/create/continue.
+- [x] Rename/archive/delete.
+- [x] Streaming abstraction and SSE implementation.
+- [x] Fake provider for tests.
 
-Deliverables:
+## M3 — Transport and outbound proxy
 
-- [ ] Inventory all `oaifree` references.
-- [ ] Inventory all legacy `Pandora` domain settings.
-- [ ] Remove direct upstream-domain knowledge from service and frontend components.
-- [ ] Introduce provider-neutral configuration namespaces.
-- [ ] Keep migrations backward-aware where practical.
+**Status: complete for v1**
 
-Target configuration direction:
-
-```yaml
-providers:
-  chatgpt:
-    enabled: true
-    mode: web
-
-transport:
-  proxy: ""
-```
-
-Exit criterion:
-
-> The application can compile without any functional dependency on `oaifree.com`.
-
----
-
-## M2 — ChatGPT Provider abstraction
-
-**Objective:** create a narrow boundary for all ChatGPT Web behavior.
-
-Initial interface scope:
-
-```go
-type Provider interface {
-    Health(ctx context.Context) error
-    Account(ctx context.Context) (*AccountInfo, error)
-    Models(ctx context.Context) ([]Model, error)
-
-    ListConversations(ctx context.Context, cursor string) (*ConversationPage, error)
-    GetConversation(ctx context.Context, id string) (*Conversation, error)
-    CreateConversation(ctx context.Context, req CreateConversationRequest) (*Conversation, error)
-    ContinueConversation(ctx context.Context, req ContinueConversationRequest) (*MessageStream, error)
-    RenameConversation(ctx context.Context, id, title string) error
-    ArchiveConversation(ctx context.Context, id string) error
-    DeleteConversation(ctx context.Context, id string) error
-}
-```
-
-Deliverables:
-
-- [ ] `internal/provider/chatgpt` package.
-- [ ] typed provider errors.
-- [ ] provider health probe.
-- [ ] no HTTP implementation details exposed to services.
-- [ ] mock provider for unit tests.
-
-Exit criterion:
-
-> Business logic can operate against a mock provider without knowing how ChatGPT Web is reached.
-
----
-
-## M3 — Transport and outbound proxy layer
-
-**Objective:** centralize network behavior and make proxy routing configurable.
-
-Required proxy schemes:
-
-- [ ] HTTP
-- [ ] HTTPS
-- [ ] SOCKS5
-- [ ] SOCKS5H / remote DNS semantics
-
-Deliverables:
-
-- [ ] `internal/transport` package.
-- [ ] connection timeout / response-header timeout.
-- [ ] streaming-safe transport.
-- [ ] proxy authentication.
-- [ ] global proxy configuration.
-- [ ] per-account proxy override.
-- [ ] redacted diagnostic logging.
-- [ ] transport health check.
-
-Exit criterion:
-
-> A ChatGPT account can be bound to a deterministic outbound route without affecting other accounts.
-
----
+- [x] HTTP proxy.
+- [x] HTTPS proxy.
+- [x] SOCKS5.
+- [x] SOCKS5H / remote DNS semantics.
+- [x] Proxy authentication.
+- [x] Global proxy.
+- [x] Per-account proxy override.
+- [x] Redacted proxy output.
+- [x] Streaming-safe shared transport settings.
 
 ## M4 — Session and credential management
 
-**Objective:** replace legacy token-refresh coupling with a provider-owned session model.
+**Status: complete for v1 credential model; browser automation deferred**
 
-Candidate credential modes should be treated as adapters rather than assumed permanent APIs:
-
-- browser/session cookies
-- access/session token where applicable
-- persisted browser profile if a browser-backed adapter is required
-
-Deliverables:
-
-- [ ] credential model migration.
-- [ ] encrypted-at-rest option or documented external-secret path.
-- [ ] session validation.
-- [ ] invalid/expired-session state reporting.
-- [ ] refresh/re-auth adapter boundary.
-- [ ] no credentials in application logs.
-
-Exit criterion:
-
-> Account health can be checked and represented without relying on `token.oaifree.com`.
-
----
+- [x] Encrypted credential store.
+- [x] Access token input.
+- [x] Session token input.
+- [x] Full browser Cookie input.
+- [x] Credential state metadata (`healthy`, `expired`, `blocked`, `unknown`).
+- [x] Provider-backed account health check.
+- [x] Persist provider health result.
+- [x] Redacted account APIs.
+- [x] Legacy plaintext migration path.
+- [ ] Browser-backed re-auth/challenge executor — post-v1 unless required by upstream.
 
 ## M5 — Conversation parity MVP
 
-**Objective:** support the core cloud conversation lifecycle.
+**Status: implemented; real-account release validation still required**
 
-Required functions:
+- [x] List upstream history.
+- [x] Read conversation.
+- [x] Create conversation.
+- [x] Continue conversation.
+- [x] SSE streaming.
+- [x] Rename.
+- [x] Archive/unarchive.
+- [x] Delete.
+- [x] Preserve upstream conversation IDs and pagination.
+- [x] Expose authenticated `/api/chatgpt/*` endpoints.
+- [x] Native `/admin/chat` surface.
+- [ ] Validate mirror-created conversation appears on official ChatGPT Web/app with a real account.
+- [ ] Validate official-Web-created conversation appears in GPT Mirror with the same account.
 
-- [ ] list history
-- [ ] read conversation
-- [ ] create conversation
-- [ ] continue conversation
-- [ ] streaming response
-- [ ] rename
-- [ ] archive/unarchive if supported
-- [ ] delete
+## M6 — Release deployment path
 
-Validation:
+**Status: implemented**
 
-- [ ] conversations created through GPT Mirror can be verified against the same underlying account state where the provider permits it.
-- [ ] externally created conversations can be surfaced where the provider permits it.
-- [ ] pagination and conversation IDs are preserved rather than locally reinvented.
+- [x] Root source-first multi-stage `Dockerfile`.
+- [x] Root `compose.yaml` uses the current GPT Mirror build, not the old PandoraHelper image.
+- [x] First-start config initialization.
+- [x] Persistent `/app/data` volume.
+- [x] `/health` probe.
+- [x] `/readiness` probe.
+- [x] CI validates Compose config.
+- [x] CI builds the actual release image.
+- [x] CI starts the release image and verifies health/readiness.
+- [x] Tag release workflow publishes multi-arch `linux/amd64` + `linux/arm64` GHCR images.
+- [x] Release image SBOM/provenance enabled.
 
-Exit criterion:
+## M7 — v1 release gates
 
-> Core chat history behaves as account-backed state rather than an independent local chat database.
+**Status: release-candidate work in progress**
+
+Required before `v1.0.0`:
+
+- [ ] `go test ./...` green on the final RC commit.
+- [x] Frontend build green.
+- [x] Fresh SQLite startup smoke green.
+- [x] Source-first Docker build/start smoke green.
+- [x] Architecture/secret guards green.
+- [ ] Real-account cloud conversation parity validation completed and documented.
+- [ ] Upgrade/restart persistence smoke completed on RC image.
+- [ ] Expired/invalid session behavior validated.
+- [ ] Proxy failure behavior validated.
+- [ ] README/release notes reviewed against actual behavior.
+- [ ] Publish `v1.0.0-rc1`.
+- [ ] RC regression pass.
+- [ ] Publish `v1.0.0`.
 
 ---
 
-## M6 — Web mirror layer
+# Experimental / post-v1 tracks
 
-**Objective:** determine how much of the official Web experience can be proxied without creating an unmaintainable frontend fork.
+## Full transparent Web mirror
 
-Work items:
+The `internal/webmirror` prototype and `cmd/webmirror-probe` are compatibility research tools. They are intentionally not presented as stable 1:1 `chatgpt.com` parity.
 
-- [ ] inventory HTML/static asset behavior.
-- [ ] inventory CSP/CORS/Origin/Host assumptions.
-- [ ] inventory WebSocket/SSE endpoints.
-- [ ] define header and cookie rewriting policy.
-- [ ] isolate HTML/JS rewriting if unavoidable.
-- [ ] detect upstream UI incompatibility automatically where possible.
+Future work may include:
 
-Decision gate:
+- CSP/origin/header/cookie rewrite research.
+- WebSocket and service-worker behavior.
+- browser-backed challenge execution where legally and technically appropriate.
+- automated upstream compatibility probes.
 
-> If transparent Web mirroring proves substantially less reliable than a thin native UI, document the trade-off before expanding custom UI scope.
+## Rich capabilities
 
----
+Deferred until core conversation parity is stable:
 
-## M7 — Files, images, search and richer capabilities
-
-Post-MVP capability adapters:
-
-- [ ] file upload/download
-- [ ] image inputs
-- [ ] image generation outputs
-- [ ] Web/search capabilities where exposed
-- [ ] Projects feasibility analysis
-- [ ] GPTs feasibility analysis
-
-Explicitly deferred until core conversation parity is stable:
-
-- Voice
+- file upload/download
+- image inputs/outputs
+- Web/search capability adapters
+- Projects/GPTs feasibility
+- voice
 - Deep Research
 - Apps/Connectors
-- rapidly changing experimental surfaces
+
+## Multi-account routing
+
+Post-v1 improvements:
+
+- account-pool health state machine
+- user/account affinity
+- concurrency limits
+- usage metadata
+- fallback policies that never silently cross conversation ownership
+
+## Optional API compatibility
+
+An OpenAI-compatible compatibility layer may be added later, but it must consume the same provider boundary rather than become a second independent ChatGPT implementation.
 
 ---
 
-## M8 — Multi-account routing and limits
+# Current execution order
 
-Deliverables:
-
-- [ ] account pool state machine.
-- [ ] healthy/unhealthy account tracking.
-- [ ] proxy affinity per account.
-- [ ] optional user-to-account pinning.
-- [ ] usage metadata.
-- [ ] concurrency limits.
-- [ ] graceful fallback without silently mixing conversation ownership.
-
----
-
-## M9 — Optional API compatibility
-
-Only after the Web/account path is stable:
-
-- [ ] OpenAI-compatible `/v1/chat/completions` adapter if useful.
-- [ ] Responses-style adapter feasibility.
-- [ ] explicit mapping of unsupported features.
-
-This API layer must consume the provider abstraction rather than become a second independent ChatGPT implementation.
-
----
-
-# Immediate execution order
-
-1. Import PandoraHelper at a pinned commit.
-2. Prove baseline builds.
-3. Add CI and smoke tests.
-4. Inventory/remove oaifree coupling.
-5. Add provider interface and mocks.
-6. Build transport/proxy layer.
-7. Implement account/session health.
-8. Implement conversation lifecycle.
-9. Only then attempt full Web mirroring.
-
----
-
-# MVP definition
-
-The first useful release is intentionally narrow:
-
-- Docker Compose deployment
-- admin/account management
-- one or more ChatGPT accounts
-- configurable outbound HTTP/SOCKS proxy
-- account/session health visibility
-- conversation list/get/create/continue/rename/delete
-- streaming output
-- stable logs and compatibility diagnostics
-
-Everything else is secondary to this baseline.
+1. Keep `go test ./...` green.
+2. Merge the v1 core-usability PR after every CI gate is green.
+3. Run real-account conversation parity E2E.
+4. Run RC restart/persistence/session/proxy regressions.
+5. Tag `v1.0.0-rc1` and validate published GHCR images.
+6. Fix RC-only defects without expanding scope.
+7. Tag `v1.0.0`.
