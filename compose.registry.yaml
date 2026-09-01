@@ -1,0 +1,50 @@
+services:
+  browser-worker:
+    image: "${GPT_MIRROR_BROWSER_IMAGE:-ghcr.io/pickarm/gpt-mirror-browser}:${GPT_MIRROR_VERSION:-latest}"
+    container_name: gpt-mirror-browser
+    restart: unless-stopped
+    shm_size: "1gb"
+    environment:
+      BROWSER_SOCKET_PATH: /run/gpt-mirror/browser.sock
+    volumes:
+      - browser-runtime:/run/gpt-mirror
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const http=require('http');const r=http.get({socketPath:'/run/gpt-mirror/browser.sock',path:'/health'},x=>{let b='';x.on('data',c=>b+=c);x.on('end',()=>process.exit(x.statusCode===200&&b.includes('ok')?0:1));});r.on('error',()=>process.exit(1));r.setTimeout(2000,()=>{r.destroy();process.exit(1);});
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  gpt-mirror:
+    image: "${GPT_MIRROR_IMAGE:-ghcr.io/pickarm/gpt-mirror}:${GPT_MIRROR_VERSION:-latest}"
+    container_name: gpt-mirror
+    restart: unless-stopped
+    depends_on:
+      browser-worker:
+        condition: service_healthy
+    ports:
+      - "${GPT_MIRROR_PORT:-9000}:9000"
+    environment:
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}"
+      SECURITY_CREDENTIAL_KEY: "${SECURITY_CREDENTIAL_KEY:?set SECURITY_CREDENTIAL_KEY in .env}"
+      TRANSPORT_PROXY_URL: "${TRANSPORT_PROXY_URL:-}"
+      CHATGPT_BROWSER_ENABLED: "${CHATGPT_BROWSER_ENABLED:-true}"
+      CHATGPT_BROWSER_SOCKET_PATH: /run/gpt-mirror/browser.sock
+    volumes:
+      - gpt-mirror-data:/app/data
+      - browser-runtime:/run/gpt-mirror
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9000/readiness"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  gpt-mirror-data:
+  browser-runtime:
