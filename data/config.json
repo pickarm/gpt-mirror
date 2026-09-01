@@ -18,6 +18,11 @@
     "max_idle_conns": 100,
     "max_idle_conns_per_host": 20
   },
+  "chatgpt": {
+    "base_url": "https://chatgpt.com",
+    "conversation_path": "/backend-api/f/conversation",
+    "user_agent": ""
+  },
   "moderation": {
     "apikey": "",
     "apiurl": "",
