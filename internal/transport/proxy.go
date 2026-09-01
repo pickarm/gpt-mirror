@@ -1,6 +1,7 @@
 package transport
 
 import (
+	appsecurity "PandoraHelper/internal/security"
 	"fmt"
 	"net"
 	"net/url"
@@ -67,7 +68,7 @@ func ParseProxy(raw string) (ProxySpec, error) {
 	return ProxySpec{
 		scheme:    scheme,
 		proxyURL:  &normalized,
-		redacted:  redactURL(&normalized),
+		redacted:  RedactProxyURL(normalized.String()),
 		remoteDNS: scheme == ProxySchemeSOCKS5H,
 	}, nil
 }
@@ -83,23 +84,9 @@ func defaultProxyPort(scheme ProxyScheme) string {
 	}
 }
 
-// RedactProxyURL removes userinfo credentials without returning parse errors or
-// preserving secret text in diagnostics.
+// RedactProxyURL removes proxy userinfo credentials without returning parse
+// errors or preserving secret text in diagnostics. The implementation delegates
+// to the centralized security redactor so URL logging rules stay consistent.
 func RedactProxyURL(raw string) string {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return "<invalid-proxy-url>"
-	}
-	return redactURL(u)
-}
-
-func redactURL(u *url.URL) string {
-	if u == nil {
-		return ""
-	}
-	copyURL := *u
-	if copyURL.User != nil {
-		copyURL.User = url.UserPassword("***", "***")
-	}
-	return copyURL.String()
+	return appsecurity.RedactURL(raw)
 }
