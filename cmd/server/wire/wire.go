@@ -6,6 +6,7 @@ package wire
 import (
 	"PandoraHelper/internal/handler"
 	chatgptprovider "PandoraHelper/internal/provider/chatgpt"
+	credentialprovider "PandoraHelper/internal/provider/credential"
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
@@ -23,11 +24,15 @@ var repositorySet = wire.NewSet(
 	repository.NewRepository,
 	repository.NewTransaction,
 	repository.NewAccountRepository,
+	repository.NewCredentialRepository,
 	repository.NewShareRepository,
 )
 
 var providerSet = wire.NewSet(
 	chatgptprovider.NewUnavailableProvider,
+	credentialprovider.NewCipher,
+	credentialprovider.NewUnavailableValidator,
+	credentialprovider.NewProvider,
 )
 
 var serviceCoordinatorSet = wire.NewSet(

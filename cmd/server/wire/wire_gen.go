@@ -9,6 +9,7 @@ package wire
 import (
 	"PandoraHelper/internal/handler"
 	chatgptprovider "PandoraHelper/internal/provider/chatgpt"
+	credentialprovider "PandoraHelper/internal/provider/credential"
 	"PandoraHelper/internal/repository"
 	"PandoraHelper/internal/server"
 	"PandoraHelper/internal/service"
@@ -36,16 +37,23 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 	userHandler := handler.NewUserHandler(handlerHandler, userService, viperViper)
 	shareRepository := repository.NewShareRepository(repositoryRepository)
 	accountRepository := repository.NewAccountRepository(repositoryRepository)
-	coordinator := service.NewServiceCoordinator(serviceService, accountRepository, shareRepository, viperViper)
+	credentialStore := repository.NewCredentialRepository(repositoryRepository)
+	credentialCipher, err := credentialprovider.NewCipher(viperViper)
+	if err != nil {
+		return nil, nil, err
+	}
+	credentialValidator := credentialprovider.NewUnavailableValidator()
+	credentialProvider := credentialprovider.NewProvider(credentialStore, credentialCipher, credentialValidator)
+	coordinator := service.NewServiceCoordinator(serviceService, accountRepository, shareRepository, credentialProvider, viperViper)
 	shareService := service.NewShareService(serviceService, shareRepository, viperViper, coordinator)
 	shareHandler := handler.NewShareHandler(handlerHandler, shareService)
-	accountService := service.NewAccountService(serviceService, accountRepository, viperViper, coordinator)
+	accountService := service.NewAccountService(serviceService, accountRepository, credentialProvider, viperViper, coordinator)
 	accountHandler := handler.NewAccountHandler(handlerHandler, accountService)
 	healthCheckHandler := handler.NewHealthCheckHandler()
 	httpServer := server.NewHTTPServer(logger, viperViper, jwtJWT, userHandler, shareHandler, accountHandler, healthCheckHandler)
 	job := server.NewJob(logger)
 	task := server.NewTask(viperViper, logger, accountService, shareService)
-	migrate := server.NewMigrate(db, logger)
+	migrate := server.NewMigrate(db, logger, transaction, accountRepository, credentialProvider)
 	appApp := newApp(httpServer, job, task, migrate)
 	return appApp, func() {
 	}, nil
@@ -53,9 +61,9 @@ func NewWire(viperViper *viper.Viper, logger *log.Logger) (*app.App, func(), err
 
 // wire.go:
 
-var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewShareRepository)
+var repositorySet = wire.NewSet(repository.NewDB, repository.NewRepository, repository.NewTransaction, repository.NewAccountRepository, repository.NewCredentialRepository, repository.NewShareRepository)
 
-var providerSet = wire.NewSet(chatgptprovider.NewUnavailableProvider)
+var providerSet = wire.NewSet(chatgptprovider.NewUnavailableProvider, credentialprovider.NewCipher, credentialprovider.NewUnavailableValidator, credentialprovider.NewProvider)
 
 var serviceCoordinatorSet = wire.NewSet(service.NewServiceCoordinator)
 

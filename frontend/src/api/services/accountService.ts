@@ -33,17 +33,21 @@ const searchAccountList = (email: string, accountType: ProductType ) =>
     });
     return res;
   });
+
 export interface AccountAddReq {
   id?: number;
   email: string;
   password?: string;
   shared?: number;
   accountType: ProductType;
+  sessionToken?: string;
   sessionKey?: string;
   refreshToken?: string;
   accessToken?: string;
-  oneApiChannelId?: number;
+  oneApiChannelId?: string | number;
   proxyUrl?: string;
+  proxyDisplay?: string;
+  hasCredential?: boolean;
 }
 
 interface ShareAccountListResp {
@@ -65,8 +69,15 @@ interface OneApiChannel {
   status: number;
 }
 
-const addAccount = (data: AccountAddReq) => apiClient.post({ url: AccountApi.add, data });
-const updateAccount = (data: AccountAddReq) => apiClient.post({ url: AccountApi.update, data });
+const normalizeWriteRequest = (data: AccountAddReq) => ({
+  ...data,
+  oneApiChannelId: data.oneApiChannelId == null ? '' : String(data.oneApiChannelId),
+  proxyDisplay: undefined,
+  hasCredential: undefined,
+});
+
+const addAccount = (data: AccountAddReq) => apiClient.post({ url: AccountApi.add, data: normalizeWriteRequest(data) });
+const updateAccount = (data: AccountAddReq) => apiClient.post({ url: AccountApi.update, data: normalizeWriteRequest(data) });
 const deleteAccount = (id: number) => apiClient.post({ url: AccountApi.delete, data: { id } });
 const refreshAccount = (id: number) => apiClient.post({ url: AccountApi.refresh, data: { id } });
 const getShareAccountList = () => apiClient.post<ShareAccountListResp>({ url: AccountApi.shareAccounts });

@@ -27,22 +27,24 @@ func NewTask(conf *viper.Viper, log *log.Logger, accountService service.AccountS
 	}
 }
 
+// RefreshAllAccountEveryday keeps the legacy task name for scheduler/config
+// compatibility. It now asks the credential provider to validate each account
+// instead of inspecting or refreshing raw tokens in the account list response.
 func (t *Task) RefreshAllAccountEveryday(ctx context.Context) error {
-	accounts, err := t.accountService.SearchAccount(context.Background(), "chatgpt", "")
+	accounts, err := t.accountService.SearchAccount(ctx, "chatgpt", "")
 	if err != nil {
 		return err
 	}
 	for _, account := range accounts {
-		if account.RefreshToken == "" {
-			t.log.Warn("Account RefreshToken is empty, skipped", zap.Int64("id", int64(account.ID)))
+		if !account.HasCredential {
+			t.log.Warn("Account credential is not configured, skipped", zap.Int64("id", int64(account.ID)))
 			continue
 		}
-		err = t.accountService.RefreshAccount(context.Background(), int64(account.ID))
-		if err != nil {
-			t.log.Error(account.Email+"Refresh Account Error", zap.Error(err))
+		if err := t.accountService.RefreshAccount(ctx, int64(account.ID)); err != nil {
+			t.log.Error("Account credential validation failed", zap.Int64("id", int64(account.ID)), zap.Error(err))
 		}
 	}
-	t.log.Info("Refresh Account Finish")
+	t.log.Info("Account credential validation finished")
 	return nil
 }
 
@@ -73,7 +75,7 @@ func (t *Task) Start(ctx context.Context) error {
 
 	if t.conf.GetBool("account.refresh.enabled") {
 		refreshCron := t.conf.GetString("account.refresh.cron")
-		t.log.Info("automatic account refresh enabled", zap.String("cron", refreshCron))
+		t.log.Info("automatic account credential validation enabled", zap.String("cron", refreshCron))
 		var err error
 		if refreshCron != "" {
 			_, err = t.scheduler.CronWithSeconds(refreshCron).Do(t.RefreshAllAccountEveryday, ctx)
@@ -84,7 +86,7 @@ func (t *Task) Start(ctx context.Context) error {
 			return err
 		}
 	} else {
-		t.log.Info("automatic account refresh disabled until a credential provider is configured")
+		t.log.Info("automatic account credential validation disabled")
 	}
 
 	if t.conf.GetBool("share.refresh.enabled") {

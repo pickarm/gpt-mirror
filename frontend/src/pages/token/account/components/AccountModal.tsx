@@ -49,6 +49,13 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
     });
   };
 
+  const credentialPlaceholder = formValue.hasCredential
+    ? '留空则保留现有加密凭据；填写后更新该秘密字段'
+    : '填写后保存到加密 credential store';
+  const proxyPlaceholder = formValue.proxyDisplay
+    ? `当前 ${formValue.proxyDisplay}；留空则保留`
+    : '例如 socks5h://user:pass@127.0.0.1:1080';
+
   return (
     <Modal
       title={title}
@@ -80,13 +87,13 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
           <Input placeholder={"仅作账户标记"} />
         </Form.Item>
         <Form.Item<AccountAddReq> label={t('token.password')} name="password">
-          <Password placeholder={"仅作本地备注/兼容字段"} />
+          <Password placeholder={credentialPlaceholder} autoComplete="new-password" />
         </Form.Item>
         <Form.Item<AccountAddReq>
           label={
             <Space>
               账号代理
-              <Tooltip title={"留空时使用全局 transport.proxy_url；支持 http、https、socks5、socks5h。优先级：账号代理 > 全局代理 > 直连"}>
+              <Tooltip title={"编辑已有账号时留空会保留当前账号代理；新账号留空时使用全局 transport.proxy_url。支持 http、https、socks5、socks5h。"}>
                 <InfoCircleOutlined/>
               </Tooltip>
             </Space>
@@ -94,7 +101,7 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
           name="proxyUrl"
         >
           <Input.Password
-            placeholder="例如 socks5h://user:pass@127.0.0.1:1080"
+            placeholder={proxyPlaceholder}
             autoComplete="new-password"
           />
         </Form.Item>
@@ -102,7 +109,7 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
           label={
             <Space>
               共享
-              <Tooltip title={"共享记录会保留在本地；Provider 接入完成前无法生成远端登录会话"} >
+              <Tooltip title={"共享记录会保留在本地；远端登录能力由 Provider 实现负责"} >
                 <InfoCircleOutlined/>
               </Tooltip>
             </Space>
@@ -151,24 +158,24 @@ export function AccountModal({ title, show, formValue, onOk, onCancel }: Account
         {formValue.accountType === 'chatgpt' ? (
           <>
             <Form.Item
-              label="Refresh Token（本地保存，当前不会自动刷新）"
+              label="Refresh Token"
               name="refreshToken"
             >
-              <Input.TextArea placeholder="Provider 接入完成后由 Provider 负责刷新流程" />
+              <Input.Password placeholder={credentialPlaceholder} autoComplete="new-password" />
             </Form.Item>
             <Form.Item
-              label="Access Token（手动填写）"
+              label="Access Token"
               name="accessToken"
             >
-              <Input.TextArea placeholder="当前仅本地保存；不会发送到旧第三方网关" />
+              <Input.Password placeholder={credentialPlaceholder} autoComplete="new-password" />
             </Form.Item>
           </>
         ) : (
           <Form.Item
-            label="Session Key（兼容字段）"
+            label="Session Key"
             name="sessionKey"
           >
-            <Input.TextArea placeholder="仅保留已有数据兼容，不再提供旧第三方获取入口" />
+            <Input.Password placeholder={credentialPlaceholder} autoComplete="new-password" />
           </Form.Item>
         )}
       </Form>
